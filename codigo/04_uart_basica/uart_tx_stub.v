@@ -9,6 +9,8 @@ module uart_tx_stub #(
     output reg        busy
 );
 
+localparam integer DATA_BITS = 8;
+
 reg [3:0] bit_index;
 reg [7:0] shift_reg;
 reg [15:0] clk_count;
@@ -35,11 +37,11 @@ always @(posedge clk or posedge rst) begin
             if (clk_count == CLKS_PER_BIT - 1) begin
                 clk_count <= 16'd0;
 
-                if (bit_index < 4'd8) begin
+                if (bit_index < DATA_BITS) begin
                     tx        <= shift_reg[0];
                     shift_reg <= {1'b0, shift_reg[7:1]};
                     bit_index <= bit_index + 4'd1;
-                end else if (bit_index == 4'd8) begin
+                end else if (bit_index == DATA_BITS) begin
                     tx        <= 1'b1;
                     bit_index <= bit_index + 4'd1;
                 end else begin
