@@ -1,1055 +1,946 @@
-{
- "nbformat": 4,
- "nbformat_minor": 5,
- "metadata": {
-  "kernelspec": {
-   "display_name": "Python 3",
-   "language": "python",
-   "name": "python3"
-  },
-  "language_info": {
-   "name": "python",
-   "version": "3.10.0"
-  }
- },
- "cells": [
-  {
-   "cell_type": "markdown",
-   "id": "title-cell",
-   "metadata": {},
-   "source": [
-    "# VHDL — Guía de Referencia\n",
-    "\n",
-    "VHDL es un lenguaje de descripción de hardware a través del cual se describe (modela) la estructura y el comportamiento de circuitos digitales ejecutados en **paralelo** e impulsados por eventos o interrupciones (ej: clock, entradas digitales, etc).\n",
-    "\n",
-    "VHDL corresponde a la mezcla entre **VHSIC** (*Very High Speed Integrated Circuit*) y **HDL** (*Hardware Description Language*).\n",
-    "\n",
-    "> **⚡ Importante:** En VHDL no se distingue entre minúsculas y mayúsculas."
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "estructura-title",
-   "metadata": {},
-   "source": [
-    "---\n",
-    "## 1. Estructura general de un programa VHDL\n",
-    "\n",
-    "Todo código VHDL se organiza en dos bloques fundamentales:\n",
-    "1. **Entidad** — declara los puertos de entrada/salida (interfaz).\n",
-    "2. **Arquitectura** — describe el comportamiento interno del circuito.\n",
-    "\n",
-    "> 💡 Las **señales** son globales a la arquitectura. Las **variables** son locales a cada proceso. Las **constantes** y subprogramas pueden ser globales o locales según dónde se declaren."
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "estructura-code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "-- Estructura general de un programa VHDL\n",
-    "\n",
-    "LIBRARY library_name;\n",
-    "USE library_name.package_name.package_parts;\n",
-    "\n",
-    "ENTITY entity_name IS\n",
-    "    PORT(\n",
-    "        port1_name : port_mode port_type;\n",
-    "        port2_name : port_mode port_type;\n",
-    "        portN_name : port_mode port_type\n",
-    "    );\n",
-    "END entity_name;\n",
-    "\n",
-    "ARCHITECTURE architecture_name OF entity_name IS\n",
-    "    -- Señales y constantes globales\n",
-    "BEGIN\n",
-    "    -- Sentencias concurrentes\n",
-    "    PROCESS(lista_sensitiva)\n",
-    "        -- Variables locales\n",
-    "    BEGIN\n",
-    "        -- Sentencias secuenciales\n",
-    "    END PROCESS;\n",
-    "END architecture_name;"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "modos-title",
-   "metadata": {},
-   "source": [
-    "### Modos de puerto\n",
-    "\n",
-    "| Modo | Dirección | Descripción |\n",
-    "|------|-----------|-------------|\n",
-    "| `IN` | → | Solo lectura. La entidad recibe el valor del exterior. |\n",
-    "| `OUT` | ← | Solo escritura. La entidad envía el valor hacia afuera. |\n",
-    "| `INOUT` | ↔ | Lectura y escritura. Puerto bidireccional (buses). |\n",
-    "| `BUFFER` | ↑ | Salida que puede leerse internamente (retroalimentación). |"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "tipos-title",
-   "metadata": {},
-   "source": [
-    "---\n",
-    "## 2. Tipos de datos\n",
-    "\n",
-    "En VHDL existen diferentes tipos de datos para almacenar bits, números enteros, punto fijo y punto flotante, que pueden ser utilizados en puertos de entrada/salida, señales, variables o constantes."
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "tipos-std-title",
-   "metadata": {},
-   "source": [
-    "### 2.1 Paquete `standard` — Librería `std`\n",
-    "\n",
-    "El paquete `standard` contiene los tipos de datos `boolean`, `bit`, `bit_vector`, `integer`, `time`, entre otros; además de operaciones lógicas y aritméticas.\n",
-    "\n",
-    "> ✅ **No requiere importar ninguna librería.**\n",
-    "\n",
-    "| Tipo | Rango / Valores | Descripción |\n",
-    "|------|----------------|-------------|\n",
-    "| `boolean` | `false`, `true` | Valor lógico booleano |\n",
-    "| `bit` | `'0'`, `'1'` | Un bit lógico |\n",
-    "| `bit_vector` | vector de bits | Sin representación numérica |\n",
-    "| `integer` | −2³² a 2³²−1 | Entero con signo (32 bits por defecto) |\n",
-    "| `natural` | ≥ 0 | Subtipo de integer |\n",
-    "| `positive` | > 0 | Subtipo de integer |\n",
-    "| `time` | — | Representa retardos (`ns`, `us`, `ms`) |"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "tipos-std-code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "-- Tipos del paquete standard (sin importar librerías)\n",
-    "\n",
-    "flag     : boolean := false;\n",
-    "\n",
-    "a        : bit := '1';\n",
-    "b        : bit := '0';\n",
-    "\n",
-    "data     : bit_vector(3 downto 0) := \"1010\";\n",
-    "\n",
-    "n        : integer := 532;\n",
-    "m        : integer := -532;\n",
-    "contador : integer range 0 to 100;   -- rango parametrizado (recomendado)\n",
-    "\n",
-    "nat      : natural  := 0;            -- natural: >= 0\n",
-    "pos      : positive := 1;            -- positive: > 0\n",
-    "\n",
-    "t1       : time := 10 ns;"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "tipos-ieee-title",
-   "metadata": {},
-   "source": [
-    "### 2.2 Paquete `std_logic_1164` — Librería IEEE\n",
-    "\n",
-    "Define **9 estados lógicos** para modelar el comportamiento físico real de circuitos digitales:\n",
-    "\n",
-    "| Estado | Nombre | Descripción |\n",
-    "|--------|--------|-------------|\n",
-    "| `'U'` | Uninitialized | Valor por defecto al no inicializar |\n",
-    "| `'X'` | Unknown | Conflicto entre drivers |\n",
-    "| `'0'` | Logic 0 | Lógica baja (fuerte) |\n",
-    "| `'1'` | Logic 1 | Lógica alta (fuerte) |\n",
-    "| `'Z'` | High impedance | Bus tristate |\n",
-    "| `'W'` | Weak unknown | Desconocido débil |\n",
-    "| `'L'` | Weak 0 | Pull-down |\n",
-    "| `'H'` | Weak 1 | Pull-up |\n",
-    "| `'-'` | Don't care | Para optimización |\n",
-    "\n",
-    "> 📦 Requiere: `library ieee; use ieee.std_logic_1164.all;`"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "tipos-ieee-code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "library ieee;\n",
-    "use ieee.std_logic_1164.all;\n",
-    "\n",
-    "-- std_logic: un bit con 9 estados posibles\n",
-    "a    : std_logic := '1';\n",
-    "b    : std_logic := 'Z';            -- alta impedancia (tristate)\n",
-    "\n",
-    "-- std_logic_vector: sin representación numérica, no permite aritmética\n",
-    "bus8 : std_logic_vector(7 downto 0) := (others => '0');  -- \"00000000\"\n",
-    "bus4 : std_logic_vector(3 downto 0) := \"1010\";"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "tipos-numeric-title",
-   "metadata": {},
-   "source": [
-    "### 2.3 Paquete `numeric_std` — Librería IEEE\n",
-    "\n",
-    "Permite realizar **operaciones aritméticas** sobre vectores de bits.\n",
-    "\n",
-    "| Tipo | Rango (n bits) | Descripción |\n",
-    "|------|---------------|-------------|\n",
-    "| `unsigned` | 0 a 2ⁿ−1 | Entero sin signo |\n",
-    "| `signed` | −2ⁿ⁻¹ a 2ⁿ⁻¹−1 | Entero con signo (complemento a 2) |\n",
-    "\n",
-    "> 📦 Requiere: `library ieee; use ieee.numeric_std.all;`  \n",
-    "> ⚠️ Si el MSB es `'1'` en `signed`, el número es negativo (complemento a 2)."
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "tipos-numeric-code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "library ieee;\n",
-    "use ieee.numeric_std.all;\n",
-    "\n",
-    "-- unsigned: solo positivos\n",
-    "a : unsigned(7 downto 0) := \"11111111\";  -- 255\n",
-    "b : unsigned(7 downto 0) := \"00001010\";  -- 10\n",
-    "\n",
-    "-- signed: positivos y negativos (complemento a 2)\n",
-    "c : signed(7 downto 0) := \"11111111\";   -- -1\n",
-    "d : signed(7 downto 0) := \"01111111\";   -- +127\n",
-    "\n",
-    "-- Operaciones aritméticas permitidas\n",
-    "suma  := a + b;                           -- unsigned + unsigned\n",
-    "resta := c - d;                           -- signed - signed"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "tipos-fixed-title",
-   "metadata": {},
-   "source": [
-    "### 2.4 Paquetes `fixed_pkg` y `float_pkg` — Librería IEEE\n",
-    "\n",
-    "Para representar números con decimales:\n",
-    "\n",
-    "| Tipo | Descripción |\n",
-    "|------|-------------|\n",
-    "| `sfixed` | Punto fijo con signo: bits enteros + bits fraccionales |\n",
-    "| `ufixed` | Punto fijo sin signo |\n",
-    "| `float32` | Punto flotante IEEE 754 (1 signo + 8 exp + 23 mantisa) |\n",
-    "| `float64` | Doble precisión IEEE 754 |"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "tipos-fixed-code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "library ieee;\n",
-    "use ieee.fixed_pkg.all;\n",
-    "use ieee.float_pkg.all;\n",
-    "\n",
-    "-- Punto fijo con signo: sfixed(enteros downto -fraccionales)\n",
-    "a : sfixed(3 downto -4) := to_sfixed(1.375, a'high, a'low);  -- 4 int + 4 frac bits\n",
-    "\n",
-    "-- Punto fijo sin signo\n",
-    "b : ufixed(2 downto -5) := to_ufixed(2.5, b'high, b'low);    -- 3 int + 5 frac bits\n",
-    "\n",
-    "-- Punto flotante IEEE 754 (32 bits)\n",
-    "c : float32 := to_float(3.14, float32);\n",
-    "\n",
-    "-- Doble precisión (64 bits)\n",
-    "d : float64;\n",
-    "d <= to_float(2.718, float64);"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "conversiones-title",
-   "metadata": {},
-   "source": [
-    "---\n",
-    "## 3. Conversiones de tipos\n",
-    "\n",
-    "VHDL es fuertemente tipado. Las conversiones son necesarias para conectar señales de distintos tipos.\n",
-    "\n",
-    "> 📌 **Regla práctica:**  \n",
-    "> - Usa `std_logic_vector` para **buses, registros y puertos** (y para concatenar bits con `&`).  \n",
-    "> - Usa `signed` / `unsigned` para **operar aritméticamente**.\n",
-    "\n",
-    "| Desde | Hacia | Función/Cast |\n",
-    "|-------|-------|--------------|\n",
-    "| `std_logic_vector` | `unsigned` | `unsigned(slv)` |\n",
-    "| `std_logic_vector` | `signed` | `signed(slv)` |\n",
-    "| `unsigned` | `std_logic_vector` | `std_logic_vector(u)` |\n",
-    "| `signed` | `std_logic_vector` | `std_logic_vector(s)` |\n",
-    "| `unsigned` | `integer` | `to_integer(u)` |\n",
-    "| `signed` | `integer` | `to_integer(s)` |\n",
-    "| `integer` | `unsigned` | `to_unsigned(n, N_bits)` |\n",
-    "| `integer` | `signed` | `to_signed(n, N_bits)` |"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "conversiones-code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "library ieee;\n",
-    "use ieee.std_logic_1164.all;\n",
-    "use ieee.numeric_std.all;\n",
-    "\n",
-    "signal slv : std_logic_vector(7 downto 0);\n",
-    "signal u   : unsigned(7 downto 0);\n",
-    "signal s   : signed(7 downto 0);\n",
-    "signal n   : integer;\n",
-    "\n",
-    "-- std_logic_vector → unsigned / signed\n",
-    "u   <= unsigned(slv);\n",
-    "s   <= signed(slv);\n",
-    "\n",
-    "-- unsigned / signed → std_logic_vector\n",
-    "slv <= std_logic_vector(u);\n",
-    "slv <= std_logic_vector(s);\n",
-    "\n",
-    "-- unsigned / signed → integer\n",
-    "n   <= to_integer(u);\n",
-    "n   <= to_integer(s);\n",
-    "\n",
-    "-- integer → unsigned / signed (hay que especificar el número de bits)\n",
-    "u   <= to_unsigned(n, 8);\n",
-    "s   <= to_signed(n, 8);"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "asignacion-title",
-   "metadata": {},
-   "source": [
-    "---\n",
-    "## 4. Señales, variables y constantes\n",
-    "\n",
-    "| | `CONSTANT` | `VARIABLE` | `SIGNAL` |\n",
-    "|---|---|---|---|\n",
-    "| **Asignación** | `:=` | `:=` | `<=` |\n",
-    "| **Ámbito** | Global/local | Local al proceso | Global a la arquitectura |\n",
-    "| **Actualización** | Inmediata (fija) | Inmediata | Siguiente delta cycle |\n",
-    "| **Representa** | Valor fijo | Variable temporal | Cable físico |\n",
-    "\n",
-    "> ⚡ **Diferencia crítica:** Las señales (`<=`) se actualizan al **final del delta cycle**. Las variables (`:=`) se actualizan **inmediatamente** dentro del proceso."
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "constantes-code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "-- CONSTANTES: declaradas en la arquitectura, antes del BEGIN\n",
-    "-- No pueden modificarse durante la ejecución.\n",
-    "\n",
-    "CONSTANT N_BITS  : integer   := 8;\n",
-    "CONSTANT CLK_DIV : integer   := 50_000_000;  -- 50 MHz\n",
-    "CONSTANT RESET   : std_logic := '0';"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "senales-code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "-- SEÑALES: declaradas en la arquitectura, antes del BEGIN\n",
-    "-- Representan conexiones físicas (cables). Se actualizan en el siguiente delta.\n",
-    "-- Si no se inicializan, toman el valor 'U' por defecto.\n",
-    "\n",
-    "SIGNAL sig1  : std_logic := '0';\n",
-    "SIGNAL bus8  : std_logic_vector(7 downto 0);\n",
-    "SIGNAL cnt   : unsigned(3 downto 0) := (others => '0');\n",
-    "SIGNAL n_sig : integer range 0 to 255 := 0;\n",
-    "\n",
-    "-- Asignación de señal\n",
-    "sig1 <= '1';\n",
-    "bus8 <= \"10101010\";\n",
-    "cnt  <= cnt + 1;"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "variables-code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "-- VARIABLES: declaradas dentro de PROCESS, antes del BEGIN del proceso\n",
-    "-- Se actualizan inmediatamente. Locales al proceso.\n",
-    "\n",
-    "PROCESS(clk)\n",
-    "    VARIABLE temp : integer := 0;\n",
-    "    VARIABLE acc  : unsigned(15 downto 0) := (others => '0');\n",
-    "BEGIN\n",
-    "    temp := temp + 1;         -- actualización inmediata\n",
-    "    acc  := (others => '0');\n",
-    "END PROCESS;"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "atributos-title",
-   "metadata": {},
-   "source": [
-    "### Atributos útiles\n",
-    "\n",
-    "| Atributo | Aplica a | Descripción |\n",
-    "|----------|----------|-------------|\n",
-    "| `'event` | Señales | `true` si la señal tuvo un evento en este delta |\n",
-    "| `'range` | Vectores | Retorna el rango completo del vector |\n",
-    "| `'high` | Vectores | Índice más alto |\n",
-    "| `'low` | Vectores | Índice más bajo |\n",
-    "| `'length` | Vectores | Número de elementos |"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "atributos-code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "-- Flanco de subida (dos formas equivalentes)\n",
-    "IF clk = '1' AND clk'event THEN ...    -- forma clásica\n",
-    "IF rising_edge(clk)        THEN ...    -- forma recomendada\n",
-    "\n",
-    "-- Flanco de bajada\n",
-    "IF falling_edge(clk) THEN ...\n",
-    "\n",
-    "-- Iterar sobre todo el rango de un vector\n",
-    "FOR i IN wire1'range LOOP ...\n",
-    "\n",
-    "-- Tamaño dinámico\n",
-    "N := bus_data'length;   -- 8 para bus_data(7 downto 0)"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "concurrentes-title",
-   "metadata": {},
-   "source": [
-    "---\n",
-    "## 5. Sentencias concurrentes\n",
-    "\n",
-    "Se ejecutan en **paralelo** de forma asíncrona. Modelan **lógica combinacional** (compuertas, multiplexadores).\n",
-    "\n",
-    "> ⚠️ Para evitar **latches** en `with-select` y `when-else`, siempre incluye `WHEN OTHERS` o `ELSE` final."
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "with-select-code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "-- WITH-SELECT: equivale a un case para asignación concurrente\n",
-    "-- Todas las condiciones deben ser mutuamente excluyentes.\n",
-    "\n",
-    "-- Multiplexador 4:1\n",
-    "WITH sel SELECT\n",
-    "    Q <= A WHEN \"00\",\n",
-    "         B WHEN \"01\",\n",
-    "         C WHEN \"10\",\n",
-    "         D WHEN OTHERS;   -- evita latch, cubre '11' y valores 'U','X',etc."
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "when-else-code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "-- WHEN-ELSE: permite condiciones más complejas (no solo igualdad)\n",
-    "-- Las condiciones se evalúan en orden (prioridad).\n",
-    "\n",
-    "-- Multiplexador 4:1 con condición\n",
-    "Q <= A WHEN sel = \"00\" ELSE\n",
-    "     B WHEN sel = \"01\" ELSE\n",
-    "     C WHEN sel = \"10\" ELSE\n",
-    "     D;   -- último ELSE implícito cubre OTHERS\n",
-    "\n",
-    "-- Ejemplo con condición compuesta\n",
-    "Y <= '1' WHEN (a = '1' AND b = '0') ELSE\n",
-    "     '1' WHEN (a = '0' AND b = '1') ELSE\n",
-    "     '0';"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "after-wait-code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "-- AFTER: asigna valores con retardo (útil en testbenches)\n",
-    "clk <= '0', '1' AFTER 10 ns, '0' AFTER 20 ns, '1' AFTER 30 ns;\n",
-    "rst <= '1', '0' AFTER 50 ns;\n",
-    "\n",
-    "-- WAIT: solo en sentencias secuenciales (procesos/procedimientos)\n",
-    "WAIT FOR 100 ns;               -- espera tiempo fijo\n",
-    "WAIT UNTIL rising_edge(clk);   -- espera condición\n",
-    "WAIT ON a, b;                  -- espera cambio en cualquiera de las señales"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "secuenciales-title",
-   "metadata": {},
-   "source": [
-    "---\n",
-    "## 6. Sentencias secuenciales\n",
-    "\n",
-    "Se ejecutan **dentro de procesos**, funciones o procedimientos, de forma secuencial. Modelan **lógica secuencial** (flip-flops, contadores, FSM).\n",
-    "\n",
-    "Los procesos corren en paralelo entre sí, pero el código dentro de cada proceso es **secuencial**. Se activan cuando alguna señal de la lista sensitiva cambia."
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "if-code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "-- IF - ELSIF - ELSE\n",
-    "-- Para evitar latch en lógica combinacional: siempre incluir ELSE\n",
-    "-- o definir un valor por defecto antes del IF.\n",
-    "\n",
-    "-- Flip-flop D con reset asíncrono (patrón estándar)\n",
-    "PROCESS(clk, rst)\n",
-    "BEGIN\n",
-    "    IF rst = '1' THEN              -- reset asíncrono (mayor prioridad)\n",
-    "        Q <= '0';\n",
-    "    ELSIF rising_edge(clk) THEN    -- flanco de subida del clock\n",
-    "        IF en = '1' THEN           -- habilitación\n",
-    "            Q <= D;\n",
-    "        END IF;\n",
-    "    END IF;\n",
-    "END PROCESS;"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "case-code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "-- CASE - WHEN\n",
-    "-- Todas las combinaciones posibles deben estar cubiertas (usar WHEN OTHERS).\n",
-    "\n",
-    "-- Decodificador BCD a 7 segmentos (segmento 'a')\n",
-    "PROCESS(bcd)\n",
-    "BEGIN\n",
-    "    CASE bcd IS\n",
-    "        WHEN \"0000\" => seg <= \"1111110\";  -- 0\n",
-    "        WHEN \"0001\" => seg <= \"0110000\";  -- 1\n",
-    "        WHEN \"0010\" => seg <= \"1101101\";  -- 2\n",
-    "        WHEN \"0011\" => seg <= \"1111001\";  -- 3\n",
-    "        WHEN \"0100\" => seg <= \"0110011\";  -- 4\n",
-    "        WHEN \"0101\" => seg <= \"1011011\";  -- 5\n",
-    "        WHEN \"0110\" => seg <= \"1011111\";  -- 6\n",
-    "        WHEN \"0111\" => seg <= \"1110000\";  -- 7\n",
-    "        WHEN \"1000\" => seg <= \"1111111\";  -- 8\n",
-    "        WHEN \"1001\" => seg <= \"1111011\";  -- 9\n",
-    "        WHEN OTHERS => seg <= \"0000000\";  -- apagado\n",
-    "    END CASE;\n",
-    "END PROCESS;"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "for-code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "-- FOR LOOP\n",
-    "-- El índice NO se declara. Se puede usar 'range del vector.\n",
-    "\n",
-    "-- Aplicar XOR bit a bit\n",
-    "FOR i IN 0 TO 7 LOOP\n",
-    "    result(i) <= data(i) XOR mask(i);\n",
-    "END LOOP;\n",
-    "\n",
-    "-- Usando el rango del vector directamente\n",
-    "FOR i IN data'range LOOP\n",
-    "    result(i) <= data(i) XOR mask(i);\n",
-    "END LOOP;\n",
-    "\n",
-    "-- WHILE LOOP\n",
-    "WHILE count < 10 LOOP\n",
-    "    count := count + 1;\n",
-    "END LOOP;"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "func-proc-code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "-- FUNCIÓN: retorna un valor. Solo lectura de parámetros.\n",
-    "FUNCTION max2(a, b : integer) RETURN integer IS\n",
-    "BEGIN\n",
-    "    IF a > b THEN\n",
-    "        RETURN a;\n",
-    "    ELSE\n",
-    "        RETURN b;\n",
-    "    END IF;\n",
-    "END FUNCTION;\n",
-    "\n",
-    "-- PROCEDIMIENTO: no retorna valor, puede modificar parámetros (OUT/INOUT).\n",
-    "PROCEDURE reset_bus(SIGNAL bus : OUT std_logic_vector) IS\n",
-    "BEGIN\n",
-    "    bus <= (others => '0');\n",
-    "END PROCEDURE;"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "componentes-title",
-   "metadata": {},
-   "source": [
-    "---\n",
-    "## 7. Componentes e instanciación\n",
-    "\n",
-    "Permiten reutilizar entidades como bloques en diseños jerárquicos (**structural modeling**).\n",
-    "\n",
-    "**Pasos:**\n",
-    "1. Declarar el componente (antes del `BEGIN` de la arquitectura).\n",
-    "2. Instanciar y mapear puertos (después del `BEGIN`)."
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "componentes-code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "ARCHITECTURE structural OF TopLevel IS\n",
-    "\n",
-    "    -- 1. Declaración del componente\n",
-    "    COMPONENT Gate_AND\n",
-    "        PORT(\n",
-    "            a, b : IN  std_logic;\n",
-    "            c    : OUT std_logic\n",
-    "        );\n",
-    "    END COMPONENT;\n",
-    "\n",
-    "    SIGNAL w1, w2, w3 : std_logic;\n",
-    "\n",
-    "BEGIN\n",
-    "    -- 2. Instanciación (pueden crearse múltiples copias)\n",
-    "    U1 : Gate_AND\n",
-    "        PORT MAP(\n",
-    "            a => w1,\n",
-    "            b => w2,\n",
-    "            c => w3\n",
-    "        );\n",
-    "\n",
-    "    -- Instanciación directa (sin declarar componente)\n",
-    "    U2 : ENTITY work.Gate_AND(arch_Gate_AND)\n",
-    "        PORT MAP(a => w1, b => w2, c => w3);\n",
-    "\n",
-    "END structural;"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "ejemplos-title",
-   "metadata": {},
-   "source": [
-    "---\n",
-    "## 8. Ejemplos completos\n",
-    "\n",
-    "### 8.1 Compuerta AND"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "ej-and",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "LIBRARY IEEE;\n",
-    "USE IEEE.STD_LOGIC_1164.ALL;\n",
-    "\n",
-    "ENTITY Gate_AND IS\n",
-    "    PORT(a, b : IN  std_logic;\n",
-    "         c    : OUT std_logic);\n",
-    "END Gate_AND;\n",
-    "\n",
-    "ARCHITECTURE arch_Gate_AND OF Gate_AND IS\n",
-    "BEGIN\n",
-    "    c <= a AND b;\n",
-    "END arch_Gate_AND;"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "ej-dff-title",
-   "metadata": {},
-   "source": [
-    "### 8.2 D Flip-Flop con reset síncrono"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "ej-dff",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "LIBRARY IEEE;\n",
-    "USE IEEE.STD_LOGIC_1164.ALL;\n",
-    "\n",
-    "ENTITY DFF IS\n",
-    "    PORT(\n",
-    "        clk, rst, D : IN  std_logic;\n",
-    "        Q, Qn       : OUT std_logic\n",
-    "    );\n",
-    "END DFF;\n",
-    "\n",
-    "ARCHITECTURE behavioral OF DFF IS\n",
-    "BEGIN\n",
-    "    PROCESS(clk)\n",
-    "    BEGIN\n",
-    "        IF rising_edge(clk) THEN\n",
-    "            IF rst = '1' THEN\n",
-    "                Q  <= '0';\n",
-    "                Qn <= '1';\n",
-    "            ELSE\n",
-    "                Q  <= D;\n",
-    "                Qn <= NOT D;\n",
-    "            END IF;\n",
-    "        END IF;\n",
-    "    END PROCESS;\n",
-    "END behavioral;"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "ej-counter-title",
-   "metadata": {},
-   "source": [
-    "### 8.3 Contador ascendente/descendente parametrizable"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "ej-counter",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "LIBRARY IEEE;\n",
-    "USE IEEE.STD_LOGIC_1164.ALL;\n",
-    "USE IEEE.NUMERIC_STD.ALL;\n",
-    "\n",
-    "ENTITY Counter IS\n",
-    "    GENERIC(N : integer := 8);   -- parametrizable: 4, 8, 16 bits...\n",
-    "    PORT(\n",
-    "        clk : IN  std_logic;\n",
-    "        rst : IN  std_logic;\n",
-    "        up  : IN  std_logic;     -- '1' = contar arriba, '0' = contar abajo\n",
-    "        cnt : OUT std_logic_vector(N-1 downto 0)\n",
-    "    );\n",
-    "END Counter;\n",
-    "\n",
-    "ARCHITECTURE behavioral OF Counter IS\n",
-    "    SIGNAL count : unsigned(N-1 downto 0);\n",
-    "BEGIN\n",
-    "    PROCESS(clk, rst)\n",
-    "    BEGIN\n",
-    "        IF rst = '1' THEN\n",
-    "            count <= (others => '0');\n",
-    "        ELSIF rising_edge(clk) THEN\n",
-    "            IF up = '1' THEN\n",
-    "                count <= count + 1;\n",
-    "            ELSE\n",
-    "                count <= count - 1;\n",
-    "            END IF;\n",
-    "        END IF;\n",
-    "    END PROCESS;\n",
-    "\n",
-    "    cnt <= std_logic_vector(count);\n",
-    "END behavioral;"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "ej-alu-title",
-   "metadata": {},
-   "source": [
-    "### 8.4 ALU 4 bits\n",
-    "\n",
-    "| `op` | Operación |\n",
-    "|------|----------|\n",
-    "| `000` | A + B |\n",
-    "| `001` | A − B |\n",
-    "| `010` | A AND B |\n",
-    "| `011` | A OR B |\n",
-    "| `100` | A XOR B |\n",
-    "| `101` | NOT A |\n",
-    "| otros | 0 |"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "ej-alu",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "LIBRARY IEEE;\n",
-    "USE IEEE.STD_LOGIC_1164.ALL;\n",
-    "USE IEEE.NUMERIC_STD.ALL;\n",
-    "\n",
-    "ENTITY ALU4 IS\n",
-    "    PORT(\n",
-    "        A, B : IN  std_logic_vector(3 downto 0);\n",
-    "        op   : IN  std_logic_vector(2 downto 0);\n",
-    "        Y    : OUT std_logic_vector(3 downto 0);\n",
-    "        zero : OUT std_logic            -- flag: resultado == 0\n",
-    "    );\n",
-    "END ALU4;\n",
-    "\n",
-    "ARCHITECTURE behavioral OF ALU4 IS\n",
-    "    SIGNAL result : unsigned(3 downto 0);\n",
-    "BEGIN\n",
-    "    PROCESS(A, B, op)\n",
-    "    BEGIN\n",
-    "        CASE op IS\n",
-    "            WHEN \"000\"  => result <= unsigned(A) + unsigned(B);\n",
-    "            WHEN \"001\"  => result <= unsigned(A) - unsigned(B);\n",
-    "            WHEN \"010\"  => result <= unsigned(A AND B);\n",
-    "            WHEN \"011\"  => result <= unsigned(A OR  B);\n",
-    "            WHEN \"100\"  => result <= unsigned(A XOR B);\n",
-    "            WHEN \"101\"  => result <= unsigned(NOT A);\n",
-    "            WHEN OTHERS => result <= (others => '0');\n",
-    "        END CASE;\n",
-    "    END PROCESS;\n",
-    "\n",
-    "    Y    <= std_logic_vector(result);\n",
-    "    zero <= '1' WHEN result = (others => '0') ELSE '0';\n",
-    "END behavioral;"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "ej-mux-title",
-   "metadata": {},
-   "source": [
-    "### 8.5 Multiplexador 4:1"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "ej-mux",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "LIBRARY IEEE;\n",
-    "USE IEEE.STD_LOGIC_1164.ALL;\n",
-    "\n",
-    "ENTITY Mux4to1 IS\n",
-    "    PORT(\n",
-    "        A, B, C, D : IN  std_logic;\n",
-    "        sel        : IN  std_logic_vector(1 downto 0);\n",
-    "        Q          : OUT std_logic\n",
-    "    );\n",
-    "END Mux4to1;\n",
-    "\n",
-    "ARCHITECTURE behavioral OF Mux4to1 IS\n",
-    "BEGIN\n",
-    "    WITH sel SELECT\n",
-    "        Q <= A WHEN \"00\",\n",
-    "             B WHEN \"01\",\n",
-    "             C WHEN \"10\",\n",
-    "             D WHEN OTHERS;\n",
-    "END behavioral;"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "ej-fsm-title",
-   "metadata": {},
-   "source": [
-    "### 8.6 Máquina de estados finitos (FSM) — Moore\n",
-    "\n",
-    "Ejemplo: detector de secuencia `\"101\"` en una entrada serial.\n",
-    "\n",
-    "```\n",
-    "        x=0         x=1\n",
-    "S0 ──────> S0    S0 ──────> S1\n",
-    "S1 ──────> S0    S1 ──────> S2\n",
-    "S2 ──────> S3    S2 ──────> S2\n",
-    "S3 ──────> S0    S3 ──────> S1  (output=1 en S3)\n",
-    "```"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "ej-fsm",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "LIBRARY IEEE;\n",
-    "USE IEEE.STD_LOGIC_1164.ALL;\n",
-    "\n",
-    "ENTITY SeqDetector IS\n",
-    "    PORT(\n",
-    "        clk, rst, x : IN  std_logic;\n",
-    "        detected    : OUT std_logic\n",
-    "    );\n",
-    "END SeqDetector;\n",
-    "\n",
-    "ARCHITECTURE behavioral OF SeqDetector IS\n",
-    "    TYPE state_type IS (S0, S1, S2, S3);   -- tipo enumerado para estados\n",
-    "    SIGNAL state, next_state : state_type;\n",
-    "BEGIN\n",
-    "\n",
-    "    -- Proceso 1: registro de estado (secuencial)\n",
-    "    PROCESS(clk, rst)\n",
-    "    BEGIN\n",
-    "        IF rst = '1' THEN\n",
-    "            state <= S0;\n",
-    "        ELSIF rising_edge(clk) THEN\n",
-    "            state <= next_state;\n",
-    "        END IF;\n",
-    "    END PROCESS;\n",
-    "\n",
-    "    -- Proceso 2: lógica de transición (combinacional)\n",
-    "    PROCESS(state, x)\n",
-    "    BEGIN\n",
-    "        CASE state IS\n",
-    "            WHEN S0 => IF x = '1' THEN next_state <= S1; ELSE next_state <= S0; END IF;\n",
-    "            WHEN S1 => IF x = '0' THEN next_state <= S2; ELSE next_state <= S1; END IF;\n",
-    "            WHEN S2 => IF x = '1' THEN next_state <= S3; ELSE next_state <= S0; END IF;\n",
-    "            WHEN S3 => IF x = '1' THEN next_state <= S1; ELSE next_state <= S0; END IF;\n",
-    "        END CASE;\n",
-    "    END PROCESS;\n",
-    "\n",
-    "    -- Salida Moore (depende solo del estado actual)\n",
-    "    detected <= '1' WHEN state = S3 ELSE '0';\n",
-    "\n",
-    "END behavioral;"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "testbench-title",
-   "metadata": {},
-   "source": [
-    "---\n",
-    "## 9. Testbench\n",
-    "\n",
-    "Un testbench es una entidad sin puertos que instancia el DUT (*Device Under Test*) y genera estímulos para verificar su comportamiento en simulación.\n",
-    "\n",
-    "> 💡 Los testbenches **no son sintetizables**. Solo se usan para simulación (ModelSim, GHDL, Vivado Simulator)."
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "testbench-code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "LIBRARY IEEE;\n",
-    "USE IEEE.STD_LOGIC_1164.ALL;\n",
-    "\n",
-    "ENTITY tb_Gate_AND IS\n",
-    "    -- Sin puertos: entidad vacía\n",
-    "END tb_Gate_AND;\n",
-    "\n",
-    "ARCHITECTURE sim OF tb_Gate_AND IS\n",
-    "\n",
-    "    -- Declarar el componente a probar (DUT)\n",
-    "    COMPONENT Gate_AND\n",
-    "        PORT(a, b : IN std_logic; c : OUT std_logic);\n",
-    "    END COMPONENT;\n",
-    "\n",
-    "    -- Señales de estimulo y observación\n",
-    "    SIGNAL tb_a, tb_b, tb_c : std_logic;\n",
-    "\n",
-    "BEGIN\n",
-    "    -- Instanciar DUT\n",
-    "    DUT : Gate_AND PORT MAP(a => tb_a, b => tb_b, c => tb_c);\n",
-    "\n",
-    "    -- Proceso de estimulos\n",
-    "    PROCESS\n",
-    "    BEGIN\n",
-    "        tb_a <= '0'; tb_b <= '0'; WAIT FOR 10 ns;  -- esperado: c='0'\n",
-    "        tb_a <= '0'; tb_b <= '1'; WAIT FOR 10 ns;  -- esperado: c='0'\n",
-    "        tb_a <= '1'; tb_b <= '0'; WAIT FOR 10 ns;  -- esperado: c='0'\n",
-    "        tb_a <= '1'; tb_b <= '1'; WAIT FOR 10 ns;  -- esperado: c='1'\n",
-    "        WAIT;  -- termina la simulación\n",
-    "    END PROCESS;\n",
-    "\n",
-    "END sim;"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "libs-title",
-   "metadata": {},
-   "source": [
-    "---\n",
-    "## 10. Resumen de librerías\n",
-    "\n",
-    "| Librería | Paquete | Tipos / Funciones principales |\n",
-    "|----------|---------|-------------------------------|\n",
-    "| *(ninguna)* | `standard` | `bit`, `bit_vector`, `boolean`, `integer`, `time` |\n",
-    "| `ieee` | `std_logic_1164` | `std_logic`, `std_logic_vector` |\n",
-    "| `ieee` | `numeric_std` | `unsigned`, `signed`, `to_integer`, `to_unsigned`, `to_signed` |\n",
-    "| `ieee` | `fixed_pkg` | `sfixed`, `ufixed`, `to_sfixed`, `to_ufixed` |\n",
-    "| `ieee` | `float_pkg` | `float32`, `float64`, `to_float` |\n",
-    "| `std` | `textio` | Lectura/escritura de archivos (simulación) |\n",
-    "| `work` | — | Entidades del proyecto actual |"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "libs-code",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "-- Importación típica para la mayoría de diseños\n",
-    "LIBRARY IEEE;\n",
-    "USE IEEE.STD_LOGIC_1164.ALL;   -- std_logic, std_logic_vector\n",
-    "USE IEEE.NUMERIC_STD.ALL;      -- unsigned, signed, conversiones"
-   ]
-  }
- ]
-}
+<h1 align="center">⚡ VHDL — Guía de Referencia</h1>
+
+<p align="center">
+  Lenguaje de descripción de hardware para modelar circuitos digitales ejecutados en paralelo,<br>
+  impulsados por eventos o interrupciones (clock, entradas digitales, etc.)
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/VHDL-IEEE%201076-blueviolet?style=flat-square"/>
+  <img src="https://img.shields.io/badge/Librería-IEEE%20%7C%20std%20%7C%20work-blue?style=flat-square"/>
+  <img src="https://img.shields.io/badge/Herramientas-ModelSim%20%7C%20GHDL%20%7C%20Vivado-green?style=flat-square"/>
+</p>
+
+---
+
+## Tabla de contenidos
+
+1. [Introducción](#1-introducción)
+2. [Estructura general](#2-estructura-general)
+3. [Tipos de datos](#3-tipos-de-datos)
+   - [Paquete `standard`](#31-paquete-standard--librería-std)
+   - [Paquete `std_logic_1164`](#32-paquete-std_logic_1164--librería-ieee)
+   - [Paquete `numeric_std`](#33-paquete-numeric_std--librería-ieee)
+   - [Paquetes `fixed_pkg` y `float_pkg`](#34-paquetes-fixed_pkg-y-float_pkg--librería-ieee)
+4. [Conversiones de tipos](#4-conversiones-de-tipos)
+5. [Señales, variables y constantes](#5-señales-variables-y-constantes)
+6. [Atributos](#6-atributos)
+7. [Sentencias concurrentes](#7-sentencias-concurrentes)
+8. [Sentencias secuenciales](#8-sentencias-secuenciales)
+9. [Subprogramas](#9-subprogramas)
+10. [Componentes](#10-componentes)
+11. [Bibliotecas](#11-bibliotecas)
+12. [Ejemplos completos](#12-ejemplos-completos)
+13. [Testbench](#13-testbench)
+
+---
+
+## 1. Introducción
+
+VHDL = **VHSIC** (*Very High Speed Integrated Circuit*) + **HDL** (*Hardware Description Language*).
+
+> [!IMPORTANT]
+> En VHDL **no se distingue** entre minúsculas y mayúsculas.
+
+---
+
+## 2. Estructura general
+
+Un código VHDL tiene dos partes fundamentales: la **Entidad** (interfaz) y la **Arquitectura** (comportamiento).
+
+```vhdl
+LIBRARY library_name;
+USE library_name.package_name.package_parts;
+
+ENTITY entity_name IS
+    PORT(
+        port1_name : port_mode port_type;
+        port2_name : port_mode port_type;
+        portN_name : port_mode port_type
+    );
+END entity_name;
+
+ARCHITECTURE architecture_name OF entity_name IS
+    -- Señales y constantes globales
+BEGIN
+    -- Sentencias concurrentes
+
+    PROCESS(lista_sensitiva)
+        -- Variables locales
+    BEGIN
+        -- Sentencias secuenciales
+    END PROCESS;
+
+END architecture_name;
+```
+
+> [!NOTE]
+> - Las **señales** son globales a la arquitectura.
+> - Las **variables** son locales a cada proceso.
+> - Las **constantes** y subprogramas pueden ser globales o locales según dónde se declaren.
+
+### Modos de puerto
+
+| Modo | Dirección | Descripción |
+|------|-----------|-------------|
+| `IN` | → entrada | Solo lectura. No puede leerse dentro de la arquitectura. |
+| `OUT` | ← salida | Solo escritura. No puede retroalimentarse. |
+| `INOUT` | ↔ bidireccional | Lectura y escritura (buses, memorias). |
+| `BUFFER` | ↑ salida con feedback | Salida que puede leerse internamente. |
+
+---
+
+## 3. Tipos de datos
+
+En VHDL existen diferentes tipos de datos para almacenar bits, enteros, punto fijo y punto flotante, organizados en paquetes según la librería de origen.
+
+### 3.1 Paquete `standard` — Librería `std`
+
+> [!IMPORTANT]
+> No requiere importar ninguna librería.
+
+| Tipo | Valores / Rango | Descripción |
+|------|----------------|-------------|
+| `boolean` | `false`, `true` | Valor lógico booleano |
+| `bit` | `'0'`, `'1'` | Un bit lógico |
+| `bit_vector` | vector de bits | Sin representación numérica |
+| `integer` | −2³² a 2³²−1 | Entero con signo (32 bits por defecto) |
+| `natural` | ≥ 0 | Subtipo de `integer` |
+| `positive` | > 0 | Subtipo de `integer` |
+| `time` | — | Representa retardos (`ns`, `us`, `ms`) |
+
+```vhdl
+flag     : boolean := false;
+
+a        : bit := '1';
+b        : bit := '0';
+
+data     : bit_vector(3 downto 0) := "1010";
+
+n        : integer := 532;
+m        : integer := -532;
+contador : integer range 0 to 100;   -- rango parametrizado (recomendado)
+
+nat      : natural  := 0;
+pos      : positive := 1;
+
+t1       : time := 10 ns;
+```
+
+> [!IMPORTANT]
+> El rango de `integer` es $-2^{32}$ a $2^{32}-1$. Sin embargo, es recomendable parametrizar el tamaño: `range 0 to 255`.
+
+---
+
+### 3.2 Paquete `std_logic_1164` — Librería IEEE
+
+> [!IMPORTANT]
+> Requiere importar: `library ieee; use ieee.std_logic_1164.all;`
+
+Define **9 estados lógicos** para modelar el comportamiento físico real:
+
+| Estado | Nombre | Descripción |
+|--------|--------|-------------|
+| `'U'` | Uninitialized | Valor por defecto al no inicializar |
+| `'X'` | Unknown | Conflicto entre drivers |
+| `'0'` | Logic 0 | Lógica baja (fuerte) |
+| `'1'` | Logic 1 | Lógica alta (fuerte) |
+| `'Z'` | High impedance | Bus tristate |
+| `'W'` | Weak unknown | Desconocido débil |
+| `'L'` | Weak 0 | Pull-down |
+| `'H'` | Weak 1 | Pull-up |
+| `'-'` | Don't care | Para optimización |
+
+```vhdl
+library ieee;
+use ieee.std_logic_1164.all;
+
+-- std_logic: un bit con 9 estados posibles
+a    : std_logic := '1';
+b    : std_logic := 'Z';                          -- alta impedancia
+
+-- std_logic_vector: sin representación numérica, no permite aritmética directa
+bus8 : std_logic_vector(7 downto 0) := (others => '0');  -- "00000000"
+bus4 : std_logic_vector(3 downto 0) := "1010";
+```
+
+---
+
+### 3.3 Paquete `numeric_std` — Librería IEEE
+
+> [!IMPORTANT]
+> Requiere importar: `library ieee; use ieee.numeric_std.all;`
+
+Permite definir números binarios con soporte aritmético completo: `+`, `-`, `*`, `/`, comparaciones y desplazamientos (`shift_left`, `shift_right`, `rotate_left`, `rotate_right`).
+
+| Tipo | Rango (n bits) | Descripción |
+|------|---------------|-------------|
+| `unsigned` | 0 a 2ⁿ−1 | Entero sin signo |
+| `signed` | −2ⁿ⁻¹ a 2ⁿ⁻¹−1 | Entero con signo (complemento a 2) |
+
+```vhdl
+library ieee;
+use ieee.numeric_std.all;
+
+-- unsigned: solo positivos
+a : unsigned(7 downto 0) := "11111111";  -- 255
+b : unsigned(7 downto 0) := "00001010";  -- 10
+
+-- signed: positivos y negativos (complemento a 2, MSB = signo)
+c : signed(7 downto 0) := "11111111";   -- -1
+d : signed(7 downto 0) := "01111111";   -- +127
+```
+
+> [!NOTE]
+> Si el MSB es `'1'` en `signed`, el valor se determina con complemento a 2.
+
+---
+
+### 3.4 Paquetes `fixed_pkg` y `float_pkg` — Librería IEEE
+
+#### Punto fijo
+
+Permite definir la cantidad de bits para la parte entera y la parte decimal. Soporta operaciones aritméticas (`+`, `-`, `*`, `/`), comparaciones y conversiones.
+
+```vhdl
+library ieee;
+use ieee.fixed_pkg.all;
+
+-- sfixed(enteros downto -fraccionales)
+a : sfixed(3 downto -4) := to_sfixed(1.375, a'high, a'low);  -- 4 bits enteros + 4 fraccionales
+b : ufixed(2 downto -5) := to_ufixed(2.5, b'high, b'low);    -- 3 bits enteros + 5 fraccionales
+```
+
+#### Punto flotante
+
+Números IEEE 754: 1 bit de signo + 8 bits de exponente + 23 bits de mantisa (float32).
+
+```vhdl
+library ieee;
+use ieee.float_pkg.all;
+
+a : float32 := to_float(3.14, float32);
+b : float64;
+b <= to_float(2.718, float64);
+```
+
+---
+
+## 4. Conversiones de tipos
+
+VHDL es **fuertemente tipado**: los tipos deben coincidir o convertirse explícitamente.
+
+> [!NOTE]
+> - Usa `std_logic_vector` para **buses, registros y puertos** (y para concatenar con `&`).
+> - Usa `signed` / `unsigned` para **operar aritméticamente**.
+
+### Tabla de conversiones
+
+| Desde | Hacia | Función / Cast |
+|-------|-------|----------------|
+| `std_logic_vector` | `unsigned` | `unsigned(slv)` |
+| `std_logic_vector` | `signed` | `signed(slv)` |
+| `unsigned` | `std_logic_vector` | `std_logic_vector(u)` |
+| `signed` | `std_logic_vector` | `std_logic_vector(s)` |
+| `unsigned` | `integer` | `to_integer(u)` |
+| `signed` | `integer` | `to_integer(s)` |
+| `integer` | `unsigned` | `to_unsigned(n, N_bits)` |
+| `integer` | `signed` | `to_signed(n, N_bits)` |
+
+```vhdl
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+signal slv : std_logic_vector(7 downto 0);
+signal u   : unsigned(7 downto 0);
+signal s   : signed(7 downto 0);
+signal n   : integer;
+
+-- std_logic_vector → unsigned / signed
+u   <= unsigned(slv);
+s   <= signed(slv);
+
+-- unsigned / signed → std_logic_vector
+slv <= std_logic_vector(u);
+slv <= std_logic_vector(s);
+
+-- unsigned / signed → integer
+n   <= to_integer(u);
+n   <= to_integer(s);
+
+-- integer → unsigned / signed (especificar cantidad de bits)
+u   <= to_unsigned(n, 8);
+s   <= to_signed(n, 8);
+```
+
+---
+
+## 5. Señales, variables y constantes
+
+### Comparativa
+
+| | `CONSTANT` | `VARIABLE` | `SIGNAL` |
+|---|---|---|---|
+| **Operador de asignación** | `:=` | `:=` | `<=` |
+| **Ámbito** | Global o local | Local al proceso | Global a la arquitectura |
+| **Actualización** | Fija (no cambia) | Inmediata | Siguiente delta cycle |
+| **Representa** | Valor fijo | Almacenamiento temporal | Cable físico |
+| **Declaración** | Antes del `BEGIN` | Dentro del proceso | Antes del `BEGIN` |
+
+> [!IMPORTANT]
+> Las señales (`<=`) se actualizan al **final del delta cycle**. Las variables (`:=`) se actualizan **inmediatamente** dentro del proceso.
+
+### Constantes
+
+```vhdl
+-- Declaradas en la arquitectura, antes del BEGIN. No modificables.
+CONSTANT N_BITS  : integer   := 8;
+CONSTANT CLK_DIV : integer   := 50_000_000;  -- 50 MHz
+CONSTANT RESET   : std_logic := '0';
+```
+
+### Variables
+
+```vhdl
+-- Declaradas dentro de PROCESS, antes del BEGIN del proceso
+PROCESS(clk)
+    VARIABLE temp : integer := 0;
+    VARIABLE acc  : unsigned(15 downto 0) := (others => '0');
+BEGIN
+    temp := temp + 1;           -- actualización inmediata
+    acc  := (others => '0');
+END PROCESS;
+```
+
+### Señales
+
+```vhdl
+-- Declaradas en la arquitectura, antes del BEGIN
+-- Si no se inicializan, toman el estado 'U' por defecto
+SIGNAL sig1  : std_logic := '0';
+SIGNAL bus8  : std_logic_vector(7 downto 0);
+SIGNAL cnt   : unsigned(3 downto 0) := (others => '0');
+SIGNAL n_sig : integer range 0 to 255 := 0;
+
+-- Asignación de señal (ocurre en el siguiente delta cycle)
+sig1 <= '1';
+bus8 <= "10101010";
+cnt  <= cnt + 1;
+
+-- Concatenación con &
+bus8 <= sig1 & "0101010";  -- MSB=sig1, resto fijo
+```
+
+---
+
+## 6. Atributos
+
+| Atributo | Aplica a | Descripción |
+|----------|----------|-------------|
+| `'event` | Señales | `true` si la señal tuvo un evento en este delta |
+| `'range` | Vectores | Retorna el rango completo del vector |
+| `'high` | Vectores / escalares | Índice o valor más alto |
+| `'low` | Vectores / escalares | Índice o valor más bajo |
+| `'length` | Vectores | Número de elementos |
+
+```vhdl
+-- Flanco de subida — dos formas equivalentes
+IF clk = '1' AND clk'event THEN ...   -- forma clásica
+IF rising_edge(clk)        THEN ...   -- forma recomendada (IEEE 1076-2008)
+
+-- Flanco de bajada
+IF falling_edge(clk) THEN ...
+
+-- Iterar sobre el rango completo de un vector
+FOR i IN wire1'range LOOP ...
+-- equivale a: FOR i IN 7 DOWNTO 0 LOOP (para wire1 de 8 bits)
+
+-- Tamaño dinámico
+N := bus_data'length;   -- 8 si bus_data es (7 downto 0)
+```
+
+---
+
+## 7. Sentencias concurrentes
+
+Se ejecutan en **paralelo** y de forma asíncrona. Modelan **lógica combinacional**.
+
+> [!WARNING]
+> Para evitar **latches** en `with-select` y `when-else`, siempre incluye `WHEN OTHERS` o `ELSE` final.
+
+### `with-select`
+
+Equivale a un `case` para asignación concurrente. Todas las condiciones deben ser mutuamente excluyentes.
+
+```vhdl
+WITH signal_condition SELECT
+    signal_out <= signal1 WHEN value1,
+                  signal2 WHEN value2,
+                  signal3 WHEN value3,
+                  signalN WHEN OTHERS;   -- evita latch
+```
+
+**Ejemplo — Multiplexador 4:1:**
+
+```vhdl
+WITH addr SELECT
+    Q <= A WHEN "00",
+         B WHEN "01",
+         C WHEN "10",
+         D WHEN OTHERS;
+```
+
+### `when-else`
+
+Permite condiciones más complejas (no solo igualdad). Las condiciones se evalúan en orden (prioridad).
+
+```vhdl
+signal_out <= signal1 WHEN condition1 ELSE
+              signal2 WHEN condition2 ELSE
+              signal3 WHEN condition3 ELSE
+              signalN;   -- ELSE final obligatorio
+```
+
+**Ejemplo — Multiplexador 4:1:**
+
+```vhdl
+Q <= A WHEN addr = "00" ELSE
+     B WHEN addr = "01" ELSE
+     C WHEN addr = "10" ELSE
+     D;
+```
+
+### Proceso (`PROCESS`)
+
+Los procesos se ejecutan en **paralelo entre sí**, pero el código interno es **secuencial**. Se activan cuando una señal de la lista sensitiva cambia.
+
+```vhdl
+PROCESS(lista_sensitiva)
+    -- Variables locales (constantes, variables, subprogramas)
+BEGIN
+    -- Sentencias secuenciales
+END PROCESS;
+```
+
+### Sentencias de tiempo
+
+#### `AFTER`
+
+Asigna valores con retardo. Útil en testbenches.
+
+```vhdl
+-- Puede usarse en sentencias concurrentes o secuenciales
+clk <= '0', '1' AFTER 10 ns, '0' AFTER 20 ns, '1' AFTER 30 ns;
+rst <= '1', '0' AFTER 50 ns;
+```
+
+#### `WAIT`
+
+Solo en sentencias secuenciales (dentro de procesos o procedimientos).
+
+```vhdl
+WAIT FOR 100 ns;               -- espera tiempo fijo
+WAIT UNTIL rising_edge(clk);   -- espera condición
+WAIT ON a, b;                  -- espera cambio en cualquiera de las señales
+```
+
+---
+
+## 8. Sentencias secuenciales
+
+Se ejecutan **dentro de procesos**, funciones o procedimientos. Modelan **lógica secuencial** (flip-flops, contadores, FSM).
+
+### `IF — ELSIF — ELSE`
+
+```vhdl
+IF condition1 THEN
+    sentence1;
+ELSIF condition2 THEN
+    sentence2;
+ELSE
+    sentenceN;    -- evita latch en lógica combinacional
+END IF;
+```
+
+**Ejemplo — Flip-flop D con reset asíncrono:**
+
+```vhdl
+PROCESS(clk, rst)
+BEGIN
+    IF rst = '1' THEN              -- reset asíncrono (mayor prioridad)
+        Q <= '0';
+    ELSIF rising_edge(clk) THEN
+        IF en = '1' THEN
+            Q <= D;
+        END IF;
+    END IF;
+END PROCESS;
+```
+
+> [!NOTE]
+> Para evitar un latch en lógica combinacional, incluir siempre la condición `ELSE` o definir un valor por defecto antes del `IF`.
+
+### `CASE — WHEN`
+
+```vhdl
+CASE expression IS
+    WHEN value1 => sentence1;
+    WHEN value2 => sentence2;
+    WHEN OTHERS => sentenceN;   -- obligatorio para cubrir todos los casos
+END CASE;
+```
+
+**Ejemplo — Decodificador BCD a 7 segmentos:**
+
+```vhdl
+CASE bcd IS
+    WHEN "0000" => seg <= "1111110";  -- 0
+    WHEN "0001" => seg <= "0110000";  -- 1
+    WHEN "0010" => seg <= "1101101";  -- 2
+    WHEN "0011" => seg <= "1111001";  -- 3
+    WHEN OTHERS => seg <= "0000000";  -- apagado
+END CASE;
+```
+
+### `FOR LOOP`
+
+```vhdl
+FOR index IN range LOOP
+    sentences;
+END LOOP;
+```
+
+> [!NOTE]
+> El índice de los bucles `FOR` **no se declara**.
+
+**Ejemplo — XOR bit a bit:**
+
+```vhdl
+FOR i IN 0 TO 7 LOOP
+    result(i) <= data(i) XOR mask(i);
+END LOOP;
+
+-- Usando el rango del vector
+FOR i IN data'range LOOP
+    result(i) <= data(i) XOR mask(i);
+END LOOP;
+```
+
+### `WHILE LOOP`
+
+```vhdl
+WHILE condition LOOP
+    sentences;
+END LOOP;
+```
+
+### Control de bucles
+
+| Sentencia | Descripción |
+|-----------|-------------|
+| `EXIT` | Sale del bucle inmediatamente |
+| `NEXT` | Salta a la siguiente iteración |
+| `NULL` | No hace nada (placeholder) |
+
+---
+
+## 9. Subprogramas
+
+### Funciones
+
+Retornan un valor. Solo lectura de parámetros.
+
+```vhdl
+FUNCTION function_name (parameters) RETURN return_type IS
+    -- declaraciones locales
+BEGIN
+    -- sentencias secuenciales
+    RETURN value;
+END FUNCTION;
+```
+
+**Ejemplo:**
+
+```vhdl
+FUNCTION max2(a, b : integer) RETURN integer IS
+BEGIN
+    IF a > b THEN
+        RETURN a;
+    ELSE
+        RETURN b;
+    END IF;
+END FUNCTION;
+```
+
+### Procedimientos
+
+No retornan valor. Pueden modificar parámetros `OUT` o `INOUT`.
+
+```vhdl
+PROCEDURE procedure_name (parameters) IS
+    -- declaraciones locales
+BEGIN
+    -- sentencias secuenciales
+END PROCEDURE;
+```
+
+**Ejemplo:**
+
+```vhdl
+PROCEDURE reset_bus(SIGNAL bus : OUT std_logic_vector) IS
+BEGIN
+    bus <= (others => '0');
+END PROCEDURE;
+```
+
+---
+
+## 10. Componentes
+
+Permiten reutilizar entidades como bloques en diseños jerárquicos (**structural modeling**).
+
+**Paso 1** — Declarar el componente (antes del `BEGIN` de la arquitectura):
+
+```vhdl
+COMPONENT component_name
+    PORT(
+        signal1 : mode type;
+        signal2 : mode type;
+        signalN : mode type
+    );
+END COMPONENT;
+```
+
+**Paso 2** — Instanciar y mapear puertos (después del `BEGIN`):
+
+```vhdl
+instance_name : component_name
+    PORT MAP(
+        port1 => signal1,
+        port2 => signal2,
+        portN => signalN
+    );
+```
+
+**Ejemplo completo — Instanciar una compuerta AND:**
+
+```vhdl
+ARCHITECTURE structural OF TopLevel IS
+
+    COMPONENT Gate_AND
+        PORT(a, b : IN std_logic; c : OUT std_logic);
+    END COMPONENT;
+
+    SIGNAL w1, w2, w3 : std_logic;
+
+BEGIN
+    U1 : Gate_AND
+        PORT MAP(a => w1, b => w2, c => w3);
+
+    -- Instanciación directa (sin declarar componente)
+    U2 : ENTITY work.Gate_AND(arch_Gate_AND)
+        PORT MAP(a => w1, b => w2, c => w3);
+
+END structural;
+```
+
+---
+
+## 11. Bibliotecas
+
+Las librerías son paquetes reutilizables en todos los proyectos.
+
+```vhdl
+LIBRARY library_name;
+USE library_name.package_name.package_parts;
+```
+
+### Librerías más utilizadas
+
+| Librería | Paquete | Contenido |
+|----------|---------|-----------|
+| *(ninguna)* | `standard` | `bit`, `boolean`, `integer`, `time`... |
+| `ieee` | `std_logic_1164` | `std_logic`, `std_logic_vector` |
+| `ieee` | `numeric_std` | `unsigned`, `signed`, conversiones |
+| `ieee` | `fixed_pkg` | `sfixed`, `ufixed` |
+| `ieee` | `float_pkg` | `float32`, `float64` |
+| `std` | `textio` | Lectura/escritura de archivos (simulación) |
+| `work` | — | Entidades del proyecto actual |
+
+```vhdl
+-- Importación típica para la mayoría de diseños
+LIBRARY IEEE;
+USE IEEE.STD_LOGIC_1164.ALL;
+USE IEEE.NUMERIC_STD.ALL;
+```
+
+---
+
+## 12. Ejemplos completos
+
+### Entidad
+
+```vhdl
+ENTITY entity_name IS
+    PORT(
+        port1_name : port_mode port_type;
+        port2_name : port_mode port_type;
+        portN_name : port_mode port_type
+    );
+END entity_name;
+```
+
+### Arquitectura
+
+```vhdl
+ARCHITECTURE architecture_name OF entity_name IS
+    -- Constantes y señales globales
+BEGIN
+    -- Sentencias concurrentes
+END architecture_name;
+```
+
+---
+
+### Ejemplo 1 — Compuerta AND
+
+```vhdl
+LIBRARY IEEE;
+USE IEEE.STD_LOGIC_1164.ALL;
+
+ENTITY Gate_AND IS
+    PORT(a, b : IN  std_logic;
+         c    : OUT std_logic);
+END Gate_AND;
+
+ARCHITECTURE arch_Gate_AND OF Gate_AND IS
+BEGIN
+    c <= a AND b;
+END arch_Gate_AND;
+```
+
+---
+
+### Ejemplo 2 — D Flip-Flop con reset síncrono
+
+```vhdl
+LIBRARY IEEE;
+USE IEEE.STD_LOGIC_1164.ALL;
+
+ENTITY DFF IS
+    PORT(
+        clk, rst, D : IN  std_logic;
+        Q, Qn       : OUT std_logic
+    );
+END DFF;
+
+ARCHITECTURE behavioral OF DFF IS
+BEGIN
+    PROCESS(clk)
+    BEGIN
+        IF rising_edge(clk) THEN
+            IF rst = '1' THEN
+                Q  <= '0';
+                Qn <= '1';
+            ELSE
+                Q  <= D;
+                Qn <= NOT D;
+            END IF;
+        END IF;
+    END PROCESS;
+END behavioral;
+```
+
+---
+
+### Ejemplo 3 — Contador ascendente/descendente parametrizable
+
+```vhdl
+LIBRARY IEEE;
+USE IEEE.STD_LOGIC_1164.ALL;
+USE IEEE.NUMERIC_STD.ALL;
+
+ENTITY Counter IS
+    GENERIC(N : integer := 8);   -- parametrizable: 4, 8, 16 bits...
+    PORT(
+        clk : IN  std_logic;
+        rst : IN  std_logic;
+        up  : IN  std_logic;     -- '1' = subir, '0' = bajar
+        cnt : OUT std_logic_vector(N-1 downto 0)
+    );
+END Counter;
+
+ARCHITECTURE behavioral OF Counter IS
+    SIGNAL count : unsigned(N-1 downto 0);
+BEGIN
+    PROCESS(clk, rst)
+    BEGIN
+        IF rst = '1' THEN
+            count <= (others => '0');
+        ELSIF rising_edge(clk) THEN
+            IF up = '1' THEN
+                count <= count + 1;
+            ELSE
+                count <= count - 1;
+            END IF;
+        END IF;
+    END PROCESS;
+
+    cnt <= std_logic_vector(count);
+END behavioral;
+```
+
+---
+
+### Ejemplo 4 — ALU 4 bits
+
+| `op` | Operación |
+|------|-----------|
+| `"000"` | A + B |
+| `"001"` | A − B |
+| `"010"` | A AND B |
+| `"011"` | A OR B |
+| `"100"` | A XOR B |
+| `"101"` | NOT A |
+| otros | 0 |
+
+```vhdl
+LIBRARY IEEE;
+USE IEEE.STD_LOGIC_1164.ALL;
+USE IEEE.NUMERIC_STD.ALL;
+
+ENTITY ALU4 IS
+    PORT(
+        A, B : IN  std_logic_vector(3 downto 0);
+        op   : IN  std_logic_vector(2 downto 0);
+        Y    : OUT std_logic_vector(3 downto 0);
+        zero : OUT std_logic
+    );
+END ALU4;
+
+ARCHITECTURE behavioral OF ALU4 IS
+    SIGNAL result : unsigned(3 downto 0);
+BEGIN
+    PROCESS(A, B, op)
+    BEGIN
+        CASE op IS
+            WHEN "000"  => result <= unsigned(A) + unsigned(B);
+            WHEN "001"  => result <= unsigned(A) - unsigned(B);
+            WHEN "010"  => result <= unsigned(A AND B);
+            WHEN "011"  => result <= unsigned(A OR  B);
+            WHEN "100"  => result <= unsigned(A XOR B);
+            WHEN "101"  => result <= unsigned(NOT A);
+            WHEN OTHERS => result <= (others => '0');
+        END CASE;
+    END PROCESS;
+
+    Y    <= std_logic_vector(result);
+    zero <= '1' WHEN result = (others => '0') ELSE '0';
+END behavioral;
+```
+
+---
+
+### Ejemplo 5 — Máquina de estados (FSM Moore) — Detector de secuencia `"101"`
+
+```
+      x=0         x=1
+S0 ──────> S0    S0 ──────> S1
+S1 ──────> S2    S1 ──────> S1
+S2 ──────> S0    S2 ──────> S3  ← detected = '1'
+S3 ──────> S0    S3 ──────> S1
+```
+
+```vhdl
+LIBRARY IEEE;
+USE IEEE.STD_LOGIC_1164.ALL;
+
+ENTITY SeqDetector IS
+    PORT(
+        clk, rst, x : IN  std_logic;
+        detected    : OUT std_logic
+    );
+END SeqDetector;
+
+ARCHITECTURE behavioral OF SeqDetector IS
+    TYPE state_type IS (S0, S1, S2, S3);
+    SIGNAL state, next_state : state_type;
+BEGIN
+
+    -- Registro de estado (secuencial)
+    PROCESS(clk, rst)
+    BEGIN
+        IF rst = '1' THEN
+            state <= S0;
+        ELSIF rising_edge(clk) THEN
+            state <= next_state;
+        END IF;
+    END PROCESS;
+
+    -- Lógica de transición (combinacional)
+    PROCESS(state, x)
+    BEGIN
+        CASE state IS
+            WHEN S0 => IF x = '1' THEN next_state <= S1; ELSE next_state <= S0; END IF;
+            WHEN S1 => IF x = '0' THEN next_state <= S2; ELSE next_state <= S1; END IF;
+            WHEN S2 => IF x = '1' THEN next_state <= S3; ELSE next_state <= S0; END IF;
+            WHEN S3 => IF x = '1' THEN next_state <= S1; ELSE next_state <= S0; END IF;
+        END CASE;
+    END PROCESS;
+
+    -- Salida Moore (depende solo del estado)
+    detected <= '1' WHEN state = S3 ELSE '0';
+
+END behavioral;
+```
+
+---
+
+## 13. Testbench
+
+El **testbench** se usa para simulación RTL en herramientas como ModelSim, GHDL o Vivado Simulator. Permite observar, depurar y analizar el comportamiento de señales y puertos.
+
+> [!IMPORTANT]
+> El testbench es una entidad **sin puertos** y su código **no es sintetizable**.
+
+```vhdl
+LIBRARY IEEE;
+USE IEEE.STD_LOGIC_1164.ALL;
+
+ENTITY tb_Gate_AND IS
+    -- Sin puertos
+END tb_Gate_AND;
+
+ARCHITECTURE sim OF tb_Gate_AND IS
+
+    -- Declarar el componente a probar (DUT)
+    COMPONENT Gate_AND
+        PORT(a, b : IN std_logic; c : OUT std_logic);
+    END COMPONENT;
+
+    -- Señales de estímulo y observación
+    SIGNAL tb_a, tb_b, tb_c : std_logic;
+
+BEGIN
+    -- Instanciar el DUT
+    DUT : Gate_AND PORT MAP(a => tb_a, b => tb_b, c => tb_c);
+
+    -- Proceso de estímulos
+    PROCESS
+    BEGIN
+        tb_a <= '0'; tb_b <= '0'; WAIT FOR 10 ns;  -- esperado: c = '0'
+        tb_a <= '0'; tb_b <= '1'; WAIT FOR 10 ns;  -- esperado: c = '0'
+        tb_a <= '1'; tb_b <= '0'; WAIT FOR 10 ns;  -- esperado: c = '0'
+        tb_a <= '1'; tb_b <= '1'; WAIT FOR 10 ns;  -- esperado: c = '1'
+        WAIT;  -- detiene la simulación
+    END PROCESS;
+
+END sim;
+```
+
+---
+
+<p align="center">
+  <sub>Guía de referencia VHDL · IEEE 1076 · Elaborada con fines académicos</sub>
+</p>
