@@ -322,6 +322,40 @@ Una vez hayamos guardado ambos archivos, lo primero es colocar el archivo del te
 
 <img width="648" height="467" alt="image" src="https://github.com/user-attachments/assets/ed418146-cb15-4712-901c-0b7a93500eaa" />
 
+Luego, debemos decirle a Quartus que ese es el testbench que queremos ejecutar y simular, por lo que vamos a "Assignments", luego a "Settings" y a la opcion de "Simulation"
+
+<img width="935" height="823" alt="image" src="https://github.com/user-attachments/assets/50bb9bf3-d005-4fc1-acd8-8ecdefc37768" />
+
+Posteriormente, seleccionamos la opcion de "Compile Test Bench" y luego en "Test Benches..."
+
+<img width="619" height="213" alt="image" src="https://github.com/user-attachments/assets/be230fb3-8160-4454-9d26-3fec8c5dc01e" />
+
+Luego en "New"
+
+<img width="711" height="320" alt="image" src="https://github.com/user-attachments/assets/06e3d688-d8e8-437c-89f4-1d790ff1331a" />
+
+Y buscamos en los tres punticos nuestro Testbench y lo agregamos dandole "Add", y adicionalmente le colocamos el nombre en la parte superior:
+
+<img width="518" height="691" alt="image" src="https://github.com/user-attachments/assets/30882dc8-fec2-4c0c-bfcb-35e1a6ebc8ba" />
+
+Damos Ok y volvemos a la parte de "Settings"donde ahora toca indicarle el archivo .do a usar, por lo que seleccionamos la opcion que dice "use script so set up simulation"
+y buscamos el .do y lo seleccionamos
+
+<img width="637" height="315" alt="image" src="https://github.com/user-attachments/assets/10bea31e-c408-4ae3-9ea7-cf606a70e132" />
+
+Le damos "Apply" y Ok, y ya tenemos todo listo para simular por lo que vamos a "Tools" - "Run Simulation" - "RTL Simulation" :
+
+<img width="604" height="482" alt="image" src="https://github.com/user-attachments/assets/6f101c4e-3358-49d6-a80b-74f7be23db24" />
+
+y ya tenemos simulacion:
+
+<img width="1658" height="509" alt="image" src="https://github.com/user-attachments/assets/ea7c79a0-34b1-4947-b12f-e7003a9acddb" />
+
+
+
+
+
+
 
 
 
