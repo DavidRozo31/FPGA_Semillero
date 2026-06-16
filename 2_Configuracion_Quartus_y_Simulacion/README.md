@@ -67,7 +67,11 @@ BEGIN
 
 END behavioral;
 ```
-*CUIDADO*: Notese que la entidad se llama "SeqDetector" por lo que el nombre del archivo al ser guardado debe corresponder con el nombre de la entidad, de lo contrario no funcionara la compilación, asi que una vez guardado nuestro archivo con el nombre de la entidad, lo colocamos como "Top level entity" dando click derecho sobre el archivo en el panel de archivos y seleccionando la opcion del mismo nombre:
+
+
+> [!IMPORTANT]
+> *CUIDADO*: Notese que la entidad se llama "SeqDetector" por lo que el nombre del archivo al ser guardado debe corresponder con el nombre de la entidad, de lo contrario no funcionara la compilación, asi que una vez guardado nuestro archivo con el nombre de la entidad, lo colocamos como "Top level entity" dando click derecho sobre el archivo en el panel de archivos y seleccionando la opcion del mismo nombre:
+
 
 <img width="1285" height="666" alt="image" src="https://github.com/user-attachments/assets/95129a68-7ec1-4523-beec-5654225d4c05" />
 
