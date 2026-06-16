@@ -23,7 +23,50 @@ Damos click en Finish y ya tenemos nuestro proyecto creado en Quartus, si deseam
 
 <img width="665" height="658" alt="image" src="https://github.com/user-attachments/assets/c3885c74-84a7-46ee-9400-3d09cc64ef92" />
 
-En dicho archivo podemos colocar un ejemplo simple de una compuerta AND que esta representada con el siguiente codigo: 
+En dicho archivo podemos colocar un ejemplo simple de detector de secuencia "101"s: 
+
+```vhdl
+LIBRARY IEEE;
+USE IEEE.STD_LOGIC_1164.ALL;
+
+ENTITY SeqDetector IS
+    PORT(
+        clk, rst, x : IN  std_logic;
+        detected    : OUT std_logic
+    );
+END SeqDetector;
+
+ARCHITECTURE behavioral OF SeqDetector IS
+    TYPE state_type IS (S0, S1, S2, S3);
+    SIGNAL state, next_state : state_type;
+BEGIN
+
+    -- Registro de estado (secuencial)
+    PROCESS(clk, rst)
+    BEGIN
+        IF rst = '1' THEN
+            state <= S0;
+        ELSIF rising_edge(clk) THEN
+            state <= next_state;
+        END IF;
+    END PROCESS;
+
+    -- Lógica de transición (combinacional)
+    PROCESS(state, x)
+    BEGIN
+        CASE state IS
+            WHEN S0 => IF x = '1' THEN next_state <= S1; ELSE next_state <= S0; END IF;
+            WHEN S1 => IF x = '0' THEN next_state <= S2; ELSE next_state <= S1; END IF;
+            WHEN S2 => IF x = '1' THEN next_state <= S3; ELSE next_state <= S0; END IF;
+            WHEN S3 => IF x = '1' THEN next_state <= S1; ELSE next_state <= S0; END IF;
+        END CASE;
+    END PROCESS;
+
+    -- Salida Moore (depende solo del estado)
+    detected <= '1' WHEN state = S3 ELSE '0';
+
+END behavioral;
+```
 
 
 
