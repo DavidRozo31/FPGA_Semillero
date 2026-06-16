@@ -268,6 +268,10 @@ END behavioral;
 El simular.do:
 
 
+> [!IMPORTANT]
+> *CUIDADO*: Notese que este simular .do referencia directamente archivos con ubicaciones dentro de mi computadora, cosas que variaran segun como hallas guardado tu proyecto y en el lugar en que lo hayas hecho, debes modificar las direcciones si no corresponden con las de tus archivos:
+
+
 ```vhdl
 # ==============================================================
 # Script de simulacion para SeqDetector
