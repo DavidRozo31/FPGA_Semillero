@@ -86,6 +86,9 @@ Una vez compilado, nos saldra el reporte de compilacion, que muestra la cantidad
 
 Ahora, para poder probar nuestro diseño usando un testbench, es necesario crearlo, por lo que vamos a hacer para ahorrar tiempo es lo siguiente, vamos a ir a una inteligencia artifical, y pedirle que nos realice un testbench para nuestro programa, y adicionalmente un simular.do para la visualizacion de nuestro programa en ModelSim, lo que nos daria lo siguiente:
 
+> [!IMPORTANT]
+> Ambos archivos deben guardarse en la carpeta del proyecto, el testbench puede ser creado desde el inicio como un vhdl normal o descargarlo directamente de la IA como vhdl, mientras que el .do lo mejor es descargarlo directamente de la IA.
+
 El TestBench:
 
 ```vhdl
@@ -315,6 +318,9 @@ wave zoom full
 
 ```
 
+Una vez hayamos guardado ambos archivos, lo primero es colocar el archivo del testbench como un "Testbench" dentro de quartus, para ello damos click derecho en el archivo y le damos a "Properties" y seleccionamos el tipo de archivo como "VHDL testbench file"
+
+<img width="648" height="467" alt="image" src="https://github.com/user-attachments/assets/ed418146-cb15-4712-901c-0b7a93500eaa" />
 
 
 
