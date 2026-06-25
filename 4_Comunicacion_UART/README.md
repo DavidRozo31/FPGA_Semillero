@@ -1,6 +1,6 @@
 # Comunicación UART en VHDL — Transmisor y Receptor
 
-> **Proyecto:** Módulos UART para FPGA (DE10-Nano, Cyclone V)  
+> **Proyecto:** Módulos UART para FPGA (Cyclone IV)  
 > **Frecuencia de reloj:** 50 MHz | **Baudrate:** 9600 bps  
 > **Arquitectura:** FSM (Máquina de Estados Finita) + Registro de desplazamiento
 
