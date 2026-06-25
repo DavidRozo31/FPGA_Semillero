@@ -3,7 +3,7 @@
 > **Módulo:** `cordic_atan2.vhd`  
 > **Algoritmo:** CORDIC modo vectoring (rotación iterativa)  
 > **Aritmética:** Punto fijo Q2.13 (16 bits con signo)  
-> **Aplicación:** Cinemática inversa del brazo 2R en FPGA (DE10-Nano, Cyclone V)
+> **Aplicación:** Cinemática inversa del brazo 2R en FPGA (Cyclone IV)
 
 ---
 
