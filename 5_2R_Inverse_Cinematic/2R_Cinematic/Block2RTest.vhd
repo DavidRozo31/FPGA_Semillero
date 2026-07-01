@@ -1,0 +1,398 @@
+-- Copyright (C) 2018  Intel Corporation. All rights reserved.
+-- Your use of Intel Corporation's design tools, logic functions 
+-- and other software and tools, and its AMPP partner logic 
+-- functions, and any output files from any of the foregoing 
+-- (including device programming or simulation files), and any 
+-- associated documentation or information are expressly subject 
+-- to the terms and conditions of the Intel Program License 
+-- Subscription Agreement, the Intel Quartus Prime License Agreement,
+-- the Intel FPGA IP License Agreement, or other applicable license
+-- agreement, including, without limitation, that your use is for
+-- the sole purpose of programming logic devices manufactured by
+-- Intel and sold by Intel or its authorized distributors.  Please
+-- refer to the applicable agreement for further details.
+
+-- PROGRAM		"Quartus Prime"
+-- VERSION		"Version 18.1.0 Build 625 09/12/2018 SJ Lite Edition"
+-- CREATED		"Mon May 18 22:58:27 2026"
+-- MODIFIED		Added Done_2Ri output (handshake for tetha1/thetha2 valid)
+
+LIBRARY ieee;
+USE ieee.std_logic_1164.all; 
+
+LIBRARY work;
+
+ENTITY Block2RTest IS 
+	PORT
+	(
+		clk :  IN  STD_LOGIC;
+		rst :  IN  STD_LOGIC;
+		Start :  IN  STD_LOGIC;
+		L1 :  IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+		L2 :  IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+		One :  IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+		Px :  IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+		Py :  IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+		Two :  IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+		Done_2Ri :  OUT  STD_LOGIC;
+		tetha1 :  OUT  STD_LOGIC_VECTOR(15 DOWNTO 0);
+		thetha2 :  OUT  STD_LOGIC_VECTOR(15 DOWNTO 0)
+	);
+END Block2RTest;
+
+ARCHITECTURE bdf_type OF Block2RTest IS 
+
+COMPONENT fp_multiplier
+	PORT(clk : IN STD_LOGIC;
+		 rst : IN STD_LOGIC;
+		 valid_i : IN STD_LOGIC;
+		 a_in : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+		 b_in : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+		 valid_o : OUT STD_LOGIC;
+		 p_out : OUT STD_LOGIC_VECTOR(15 DOWNTO 0)
+	);
+END COMPONENT;
+
+COMPONENT fp_adder
+	PORT(clk : IN STD_LOGIC;
+		 rst : IN STD_LOGIC;
+		 op : IN STD_LOGIC;
+		 valid_i : IN STD_LOGIC;
+		 a_in : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+		 b_in : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+		 valid_o : OUT STD_LOGIC;
+		 p_out : OUT STD_LOGIC_VECTOR(15 DOWNTO 0)
+	);
+END COMPONENT;
+
+COMPONENT fp_divider
+	PORT(clk : IN STD_LOGIC;
+		 rst : IN STD_LOGIC;
+		 start : IN STD_LOGIC;
+		 den_in : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+		 num_in : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+		 done : OUT STD_LOGIC;
+		 quot_out : OUT STD_LOGIC_VECTOR(15 DOWNTO 0)
+	);
+END COMPONENT;
+
+COMPONENT sqrt_q13
+	PORT(clk : IN STD_LOGIC;
+		 rst : IN STD_LOGIC;
+		 start : IN STD_LOGIC;
+		 x_in : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+		 done : OUT STD_LOGIC;
+		 y_out : OUT STD_LOGIC_VECTOR(15 DOWNTO 0)
+	);
+END COMPONENT;
+
+COMPONENT cordic_atan2
+	PORT(clk : IN STD_LOGIC;
+		 rst : IN STD_LOGIC;
+		 start : IN STD_LOGIC;
+		 x_in : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+		 y_in : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
+		 done : OUT STD_LOGIC;
+		 angle : OUT STD_LOGIC_VECTOR(15 DOWNTO 0)
+	);
+END COMPONENT;
+
+SIGNAL	SYNTHESIZED_WIRE_0 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_1 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_2 :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+SIGNAL	SYNTHESIZED_WIRE_3 :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+SIGNAL	SYNTHESIZED_WIRE_4 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_5 :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+SIGNAL	SYNTHESIZED_WIRE_6 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_7 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_8 :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+SIGNAL	SYNTHESIZED_WIRE_9 :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+SIGNAL	SYNTHESIZED_WIRE_10 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_11 :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+SIGNAL	SYNTHESIZED_WIRE_12 :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+SIGNAL	SYNTHESIZED_WIRE_55 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_56 :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+SIGNAL	SYNTHESIZED_WIRE_16 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_17 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_18 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_19 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_20 :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+SIGNAL	SYNTHESIZED_WIRE_21 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_22 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_23 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_24 :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+SIGNAL	SYNTHESIZED_WIRE_57 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_58 :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+SIGNAL	SYNTHESIZED_WIRE_32 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_33 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_34 :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+SIGNAL	SYNTHESIZED_WIRE_59 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_36 :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+SIGNAL	SYNTHESIZED_WIRE_37 :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+SIGNAL	SYNTHESIZED_WIRE_38 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_39 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_41 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_42 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_43 :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+SIGNAL	SYNTHESIZED_WIRE_44 :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+SIGNAL	SYNTHESIZED_WIRE_45 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_46 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_47 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_48 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_49 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_50 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_51 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_52 :  STD_LOGIC;
+SIGNAL	SYNTHESIZED_WIRE_53 :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+SIGNAL	SYNTHESIZED_WIRE_54 :  STD_LOGIC_VECTOR(15 DOWNTO 0);
+
+-- Señales nuevas, únicamente para el handshake Done_2Ri
+SIGNAL	SYNTHESIZED_WIRE_60 :  STD_LOGIC;  -- done del CORDIC que calcula thetha2
+SIGNAL	SYNTHESIZED_WIRE_61 :  STD_LOGIC;  -- valid_o del sumador final que calcula tetha1
+
+
+BEGIN 
+SYNTHESIZED_WIRE_0 <= '0';
+SYNTHESIZED_WIRE_6 <= '1';
+SYNTHESIZED_WIRE_18 <= '1';
+SYNTHESIZED_WIRE_32 <= '0';
+SYNTHESIZED_WIRE_41 <= '1';
+SYNTHESIZED_WIRE_51 <= '0';
+
+
+
+b2v_inst : fp_multiplier
+PORT MAP(clk => clk,
+		 rst => rst,
+		 valid_i => Start,
+		 a_in => Px,
+		 b_in => Px,
+		 valid_o => SYNTHESIZED_WIRE_47,
+		 p_out => SYNTHESIZED_WIRE_53);
+
+
+b2v_inst1 : fp_multiplier
+PORT MAP(clk => clk,
+		 rst => rst,
+		 valid_i => Start,
+		 a_in => Py,
+		 b_in => Py,
+		 valid_o => SYNTHESIZED_WIRE_48,
+		 p_out => SYNTHESIZED_WIRE_54);
+
+
+b2v_inst10 : fp_adder
+PORT MAP(clk => clk,
+		 rst => rst,
+		 op => SYNTHESIZED_WIRE_0,
+		 valid_i => SYNTHESIZED_WIRE_1,
+		 a_in => SYNTHESIZED_WIRE_2,
+		 b_in => SYNTHESIZED_WIRE_3,
+		 valid_o => SYNTHESIZED_WIRE_17,
+		 p_out => SYNTHESIZED_WIRE_9);
+
+
+b2v_inst11 : fp_multiplier
+PORT MAP(clk => clk,
+		 rst => rst,
+		 valid_i => SYNTHESIZED_WIRE_4,
+		 a_in => SYNTHESIZED_WIRE_5,
+		 b_in => L2,
+		 valid_o => SYNTHESIZED_WIRE_22,
+		 p_out => SYNTHESIZED_WIRE_11);
+
+
+b2v_inst12 : fp_adder
+PORT MAP(clk => clk,
+		 rst => rst,
+		 op => SYNTHESIZED_WIRE_6,
+		 valid_i => SYNTHESIZED_WIRE_7,
+		 a_in => SYNTHESIZED_WIRE_8,
+		 b_in => SYNTHESIZED_WIRE_9,
+		 valid_o => SYNTHESIZED_WIRE_21,
+		 p_out => SYNTHESIZED_WIRE_12);
+
+
+
+b2v_inst14 : fp_divider
+PORT MAP(clk => clk,
+		 rst => rst,
+		 start => SYNTHESIZED_WIRE_10,
+		 den_in => SYNTHESIZED_WIRE_11,
+		 num_in => SYNTHESIZED_WIRE_12,
+		 done => SYNTHESIZED_WIRE_55,
+		 quot_out => SYNTHESIZED_WIRE_56);
+
+
+b2v_inst15 : fp_multiplier
+PORT MAP(clk => clk,
+		 rst => rst,
+		 valid_i => SYNTHESIZED_WIRE_55,
+		 a_in => SYNTHESIZED_WIRE_56,
+		 b_in => SYNTHESIZED_WIRE_56,
+		 valid_o => SYNTHESIZED_WIRE_19,
+		 p_out => SYNTHESIZED_WIRE_20);
+
+
+SYNTHESIZED_WIRE_7 <= SYNTHESIZED_WIRE_16 AND SYNTHESIZED_WIRE_17;
+
+
+b2v_inst17 : fp_adder
+PORT MAP(clk => clk,
+		 rst => rst,
+		 op => SYNTHESIZED_WIRE_18,
+		 valid_i => SYNTHESIZED_WIRE_19,
+		 a_in => One,
+		 b_in => SYNTHESIZED_WIRE_20,
+		 valid_o => SYNTHESIZED_WIRE_23,
+		 p_out => SYNTHESIZED_WIRE_24);
+
+
+SYNTHESIZED_WIRE_10 <= SYNTHESIZED_WIRE_21 AND SYNTHESIZED_WIRE_22;
+
+
+b2v_inst19 : sqrt_q13
+PORT MAP(clk => clk,
+		 rst => rst,
+		 start => SYNTHESIZED_WIRE_23,
+		 x_in => SYNTHESIZED_WIRE_24,
+		 done => SYNTHESIZED_WIRE_57,
+		 y_out => SYNTHESIZED_WIRE_58);
+
+
+b2v_inst2 : fp_multiplier
+PORT MAP(clk => clk,
+		 rst => rst,
+		 valid_i => Start,
+		 a_in => L1,
+		 b_in => L1,
+		 valid_o => SYNTHESIZED_WIRE_49,
+		 p_out => SYNTHESIZED_WIRE_2);
+
+
+
+b2v_inst21 : cordic_atan2
+PORT MAP(clk => clk,
+		 rst => rst,
+		 start => SYNTHESIZED_WIRE_57,
+		 x_in => SYNTHESIZED_WIRE_56,
+		 y_in => SYNTHESIZED_WIRE_58,
+		 done => SYNTHESIZED_WIRE_60,
+		 angle => thetha2);
+
+
+b2v_inst23 : fp_multiplier
+PORT MAP(clk => clk,
+		 rst => rst,
+		 valid_i => SYNTHESIZED_WIRE_55,
+		 a_in => L2,
+		 b_in => SYNTHESIZED_WIRE_56,
+		 valid_o => SYNTHESIZED_WIRE_33,
+		 p_out => SYNTHESIZED_WIRE_34);
+
+
+b2v_inst24 : fp_multiplier
+PORT MAP(clk => clk,
+		 rst => rst,
+		 valid_i => SYNTHESIZED_WIRE_57,
+		 a_in => L2,
+		 b_in => SYNTHESIZED_WIRE_58,
+		 valid_o => SYNTHESIZED_WIRE_39,
+		 p_out => SYNTHESIZED_WIRE_37);
+
+
+b2v_inst25 : fp_adder
+PORT MAP(clk => clk,
+		 rst => rst,
+		 op => SYNTHESIZED_WIRE_32,
+		 valid_i => SYNTHESIZED_WIRE_33,
+		 a_in => L1,
+		 b_in => SYNTHESIZED_WIRE_34,
+		 valid_o => SYNTHESIZED_WIRE_38,
+		 p_out => SYNTHESIZED_WIRE_36);
+
+
+
+b2v_inst27 : cordic_atan2
+PORT MAP(clk => clk,
+		 rst => rst,
+		 start => SYNTHESIZED_WIRE_59,
+		 x_in => SYNTHESIZED_WIRE_36,
+		 y_in => SYNTHESIZED_WIRE_37,
+		 done => SYNTHESIZED_WIRE_45,
+		 angle => SYNTHESIZED_WIRE_44);
+
+
+SYNTHESIZED_WIRE_59 <= SYNTHESIZED_WIRE_38 AND SYNTHESIZED_WIRE_39;
+
+
+b2v_inst3 : fp_multiplier
+PORT MAP(clk => clk,
+		 rst => rst,
+		 valid_i => Start,
+		 a_in => L2,
+		 b_in => L2,
+		 valid_o => SYNTHESIZED_WIRE_50,
+		 p_out => SYNTHESIZED_WIRE_3);
+
+
+b2v_inst30 : cordic_atan2
+PORT MAP(clk => clk,
+		 rst => rst,
+		 start => SYNTHESIZED_WIRE_59,
+		 x_in => Px,
+		 y_in => Py,
+		 done => SYNTHESIZED_WIRE_46,
+		 angle => SYNTHESIZED_WIRE_43);
+
+
+b2v_inst31 : fp_adder
+PORT MAP(clk => clk,
+		 rst => rst,
+		 op => SYNTHESIZED_WIRE_41,
+		 valid_i => SYNTHESIZED_WIRE_42,
+		 a_in => SYNTHESIZED_WIRE_43,
+		 b_in => SYNTHESIZED_WIRE_44,
+		 valid_o => SYNTHESIZED_WIRE_61,
+		 p_out => tetha1);
+
+
+
+SYNTHESIZED_WIRE_42 <= SYNTHESIZED_WIRE_45 AND SYNTHESIZED_WIRE_46;
+
+
+SYNTHESIZED_WIRE_52 <= SYNTHESIZED_WIRE_47 AND SYNTHESIZED_WIRE_48;
+
+
+SYNTHESIZED_WIRE_1 <= SYNTHESIZED_WIRE_49 AND SYNTHESIZED_WIRE_50;
+
+
+b2v_inst6 : fp_adder
+PORT MAP(clk => clk,
+		 rst => rst,
+		 op => SYNTHESIZED_WIRE_51,
+		 valid_i => SYNTHESIZED_WIRE_52,
+		 a_in => SYNTHESIZED_WIRE_53,
+		 b_in => SYNTHESIZED_WIRE_54,
+		 valid_o => SYNTHESIZED_WIRE_16,
+		 p_out => SYNTHESIZED_WIRE_8);
+
+
+
+
+b2v_inst9 : fp_multiplier
+PORT MAP(clk => clk,
+		 rst => rst,
+		 valid_i => Start,
+		 a_in => L1,
+		 b_in => Two,
+		 valid_o => SYNTHESIZED_WIRE_4,
+		 p_out => SYNTHESIZED_WIRE_5);
+
+
+-- Handshake de salida: avisa cuando thetha2 (CORDIC) y tetha1 (sumador final)
+-- están ambos listos y estables.
+Done_2Ri <= SYNTHESIZED_WIRE_60 AND SYNTHESIZED_WIRE_61;
+
+
+END bdf_type;

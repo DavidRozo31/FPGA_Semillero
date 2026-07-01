@@ -1,0 +1,60 @@
+-- =============================================================
+--  fp_adder.vhd
+--  Sumador/Restador Q2.13 pipelined — latencia 1 ciclo
+--
+--  Operación: p_out = a_in + b_in  (op='0')
+--             p_out = a_in - b_in  (op='1')
+--
+--  Uso en IK-2R:
+--    - r²    = Px² + Py²
+--    - Σ     = L1² + L2²
+--    - num   = r² − Σ
+--    - 1−cos²θ₂
+--    - θ₁ = atan2(y,x) − atan2(k2,k1)
+--    - k1    = L1 + L2·cos(θ₂)
+--
+--  Formato Q2.13 (16 bits signed). La suma de dos valores
+--  Q2.13 puede desbordarse si la suma supera ±3.99.
+--  En las ecuaciones IK los rangos son seguros.
+--
+--  Universidad Militar Nueva Granada
+-- =============================================================
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+entity fp_adder is
+    Port (
+        clk     : in  std_logic;
+        rst     : in  std_logic;
+        a_in    : in  signed(15 downto 0);   -- Q2.13
+        b_in    : in  signed(15 downto 0);   -- Q2.13
+        op      : in  std_logic;             -- '0'=suma, '1'=resta
+        valid_i : in  std_logic;
+        p_out   : out signed(15 downto 0);   -- Q2.13
+        valid_o : out std_logic
+    );
+end fp_adder;
+
+architecture rtl of fp_adder is
+    signal result_reg : signed(15 downto 0) := (others => '0');
+    signal valid_reg  : std_logic := '0';
+begin
+    process(clk, rst)
+    begin
+        if rst = '1' then
+            result_reg <= (others => '0');
+            valid_reg  <= '0';
+        elsif rising_edge(clk) then
+            valid_reg <= valid_i;
+            if op = '1' then
+                result_reg <= a_in - b_in;
+            else
+                result_reg <= a_in + b_in;
+            end if;
+        end if;
+    end process;
+
+    p_out   <= result_reg;
+    valid_o <= valid_reg;
+end rtl;

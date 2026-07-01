@@ -1,0 +1,114 @@
+-- =============================================================
+--  fp_divider.vhd
+--  Divisor Q2.13 ÷ Q2.13 → Q2.13
+--  Algoritmo: Shift-subtract (restoring), 16 iteraciones
+--  Latencia: 18 ciclos (16 iteraciones + 2 control)
+--
+--  Uso principal en IK 2R:
+--    cosθ₂ = (r² – L1² – L2²) / (2·L1·L2)
+--
+--  Precondición: |num| ≤ |den| (cinemática garantiza |cosθ₂| ≤ 1)
+--  Si den_in = 0 el resultado no está definido.
+-- =============================================================
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+entity fp_divider is
+    Port (
+        clk      : in  std_logic;
+        rst      : in  std_logic;
+        start    : in  std_logic;
+        num_in   : in  signed(15 downto 0);
+        den_in   : in  signed(15 downto 0);
+        quot_out : out signed(15 downto 0);
+        done     : out std_logic
+    );
+end fp_divider;
+
+architecture rtl of fp_divider is
+
+    constant N_DIV : integer := 16;
+
+    type state_t is (S_IDLE, S_RUN, S_FINISH);
+    signal state : state_t := S_IDLE;
+
+    signal rem_s  : signed(31 downto 0) := (others => '0');
+    signal den_s  : signed(31 downto 0) := (others => '0');
+    signal quot_s : unsigned(31 downto 0) := (others => '0');
+    signal neg_s  : std_logic := '0';
+    signal cnt    : integer range 0 to N_DIV := 0;
+    signal result : signed(15 downto 0) := (others => '0');
+    signal done_r : std_logic := '0';
+
+begin
+
+    process(clk, rst)
+        variable rem_v : signed(31 downto 0);
+        variable q16   : signed(15 downto 0);
+    begin
+        if rst = '1' then
+            state  <= S_IDLE;
+            rem_s  <= (others => '0');
+            den_s  <= (others => '0');
+            quot_s <= (others => '0');
+            neg_s  <= '0';
+            cnt    <= 0;
+            result <= (others => '0');
+            done_r <= '0';
+        elsif rising_edge(clk) then
+            done_r <= '0';
+            case state is
+
+                when S_IDLE =>
+                    if start = '1' then
+                        neg_s <= num_in(15) xor den_in(15);
+                        -- Numerador escalado ×2^13 para que el cociente salga en Q2.13
+                        if num_in(15) = '1' then
+                            rem_s <= shift_left(resize(-num_in, 32), 13);
+                        else
+                            rem_s <= shift_left(resize(num_in,  32), 13);
+                        end if;
+                        if den_in(15) = '1' then
+                            den_s <= resize(-den_in, 32);
+                        else
+                            den_s <= resize(den_in,  32);
+                        end if;
+                        quot_s <= (others => '0');
+                        cnt    <= 0;
+                        state  <= S_RUN;
+                    end if;
+
+                when S_RUN =>
+                    rem_v := shift_left(rem_s, 1);
+                    if rem_v >= den_s then
+                        rem_s  <= rem_v - den_s;
+                        quot_s <= shift_left(quot_s, 1) or to_unsigned(1, 32);
+                    else
+                        rem_s  <= rem_v;
+                        quot_s <= shift_left(quot_s, 1);
+                    end if;
+                    if cnt = N_DIV - 1 then
+                        state <= S_FINISH;
+                    else
+                        cnt <= cnt + 1;
+                    end if;
+
+                when S_FINISH =>
+                    q16 := signed(quot_s(15 downto 0));
+                    if neg_s = '1' then
+                        result <= -q16;
+                    else
+                        result <= q16;
+                    end if;
+                    done_r <= '1';
+                    state  <= S_IDLE;
+
+            end case;
+        end if;
+    end process;
+
+    quot_out <= result;
+    done     <= done_r;
+
+end rtl;

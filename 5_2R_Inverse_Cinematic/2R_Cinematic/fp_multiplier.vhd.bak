@@ -1,0 +1,47 @@
+-- =============================================================
+--  fp_multiplier.vhd
+--  Multiplicador Q2.13 × Q2.13 → Q2.13  (pipelined, 1 ciclo)
+--
+--  Uso:  resultado = (a * b) >> 13   (aritmético)
+--  Latencia: 1 ciclo de reloj
+--  Overhead de área: 1 registro de 32 bits
+--
+--  Para usar en paralelo instanciar varias veces con
+--  el mismo clk y diferentes entradas.
+-- =============================================================
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+entity fp_multiplier is
+    Port (
+        clk    : in  std_logic;
+        rst    : in  std_logic;
+        a_in   : in  signed(15 downto 0);   -- operando A  Q2.13
+        b_in   : in  signed(15 downto 0);   -- operando B  Q2.13
+        valid_i: in  std_logic;             -- dato entrada válido
+        p_out  : out signed(15 downto 0);   -- producto     Q2.13
+        valid_o: out std_logic              -- dato salida válido
+    );
+end fp_multiplier;
+
+architecture rtl of fp_multiplier is
+    signal prod_reg  : signed(31 downto 0) := (others => '0');
+    signal valid_reg : std_logic := '0';
+begin
+    process(clk, rst)
+    begin
+        if rst = '1' then
+            prod_reg  <= (others => '0');
+            valid_reg <= '0';
+        elsif rising_edge(clk) then
+            prod_reg  <= a_in * b_in;   -- Q4.26
+            valid_reg <= valid_i;
+        end if;
+    end process;
+
+    -- Extraer Q2.13: bits [28:13] del producto Q4.26
+    -- bit 28 = signo extendido del Q2.13
+    p_out   <= prod_reg(28 downto 13);
+    valid_o <= valid_reg;
+end rtl;

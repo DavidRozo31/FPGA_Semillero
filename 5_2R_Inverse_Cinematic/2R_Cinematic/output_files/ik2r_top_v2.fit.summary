@@ -1,0 +1,16 @@
+Fitter Status : Failed - Wed Jul 01 17:21:42 2026
+Quartus Prime Version : 18.1.0 Build 625 09/12/2018 SJ Lite Edition
+Revision Name : ik2r_top_v2
+Top-level Entity Name : Block2RTest
+Family : Cyclone IV E
+Device : EP4CE6E22C8
+Timing Models : Final
+Total logic elements : 3,116 / 6,272 ( 50 % )
+    Total combinational functions : 2,808 / 6,272 ( 45 % )
+    Dedicated logic registers : 1,912 / 6,272 ( 30 % )
+Total registers : 1912
+Total pins : 132 / 92 ( 143 % )
+Total virtual pins : 0
+Total memory bits : 24 / 276,480 ( < 1 % )
+Embedded Multiplier 9-bit elements : 20 / 30 ( 67 % )
+Total PLLs : 0 / 2 ( 0 % )

@@ -1,0 +1,171 @@
+-- =============================================================
+--  cordic_sincos_16.vhd
+--  CORDIC modo rotación — Sin y Cos en Q2.13 (16 bits)
+--
+--  Entradas:
+--    angle_in : ángulo en Q2.13 (radianes × 8192), rango ±π
+--  Salidas:
+--    sin_out  : sin(angle_in) en Q2.13
+--    cos_out  : cos(angle_in) en Q2.13
+--    done     : pulso 1 ciclo cuando resultado válido
+--
+--  Latencia: N_ITER+1 = 13 ciclos (igual que cordic_atan2)
+--
+--  Formato Q2.13:
+--    1.0 → 8192,  π → 25736 (pero ±π cabe en 16 bits signed)
+--    sin/cos ∈ [−1,1] → [−8192, 8192]
+--
+--  El factor K=0.6073 (CORDIC_K en cordic_pkg) se aplica como
+--  valor inicial de x para que la magnitud de salida sea correcta.
+--
+--  NOTA: cordic_core.vhd original usa 32 bits y es INCOMPATIBLE
+--  con el resto del diseño IK-2R (16 bits Q2.13). Este módulo
+--  lo reemplaza completamente.
+--
+--  Universidad Militar Nueva Granada
+-- =============================================================
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+use work.cordic_pkg.ALL;   -- N_BITS=16, N_ITER=12, ATAN_TABLE, CORDIC_K
+
+entity cordic_sincos_16 is
+    Port (
+        clk      : in  std_logic;
+        rst      : in  std_logic;
+        start    : in  std_logic;
+        angle_in : in  signed(15 downto 0);  -- Q2.13, rango −π..+π
+        sin_out  : out signed(15 downto 0);  -- Q2.13
+        cos_out  : out signed(15 downto 0);  -- Q2.13
+        done     : out std_logic
+    );
+end cordic_sincos_16;
+
+architecture pipeline of cordic_sincos_16 is
+
+    -- Pipeline de N_ITER+1 etapas (etapa 0 = carga)
+    type data_array is array (0 to N_ITER) of signed(N_BITS-1 downto 0);
+
+    signal x_pipe     : data_array;
+    signal y_pipe     : data_array;
+    signal z_pipe     : data_array;
+    signal valid_pipe : std_logic_vector(N_ITER downto 0);
+
+    -- Reducción de rango: si |ángulo| > π/2 aplicar identidad
+    -- sen(π − θ) = sen(θ),  cos(π − θ) = −cos(θ)
+    -- sen(−π − θ) = −sen(θ), cos(−π − θ) = −cos(θ)
+    signal flip_cos   : std_logic_vector(N_ITER downto 0);  -- invertir cos al final
+    signal flip_sin   : std_logic_vector(N_ITER downto 0);  -- invertir sin al final
+
+    -- PI/2 en Q2.13 = 12868
+    constant PI2_POS : signed(15 downto 0) := to_signed( 12868, 16);
+    constant PI2_NEG : signed(15 downto 0) := to_signed(-12868, 16);
+    -- PI en Q2.13 = 25736
+    constant PI_Q13  : signed(15 downto 0) := to_signed( 25736, 16);
+
+begin
+
+    -- ----------------------------------------------------------
+    --  Etapa 0: carga y reducción de cuadrante
+    --  CORDIC modo rotación converge solo para |z| ≤ π/2
+    --  Para otros cuadrantes usamos las identidades:
+    --    Q2 (π/2 < θ ≤ π)   : usar θ' = π−θ, negar cos
+    --    Q3 (−π ≤ θ < −π/2) : usar θ' = −π−θ, negar ambos
+    -- ----------------------------------------------------------
+    process(clk, rst)
+        variable ang_v : signed(15 downto 0);
+    begin
+        if rst = '1' then
+            x_pipe(0)     <= (others => '0');
+            y_pipe(0)     <= (others => '0');
+            z_pipe(0)     <= (others => '0');
+            valid_pipe(0) <= '0';
+            flip_cos(0)   <= '0';
+            flip_sin(0)   <= '0';
+        elsif rising_edge(clk) then
+            valid_pipe(0) <= start;
+            if start = '1' then
+                -- Valor inicial: x = K (factor de ganancia CORDIC), y = 0
+                -- Desplazamos 1 bit para guardia igual que en cordic_atan2
+                x_pipe(0) <= shift_right(CORDIC_K, 1);
+                y_pipe(0) <= (others => '0');
+
+                -- Reducción de cuadrante
+                if angle_in > PI2_POS then
+                    -- θ en (π/2, π]: usar π − θ, negar cos
+                    ang_v       := PI_Q13 - angle_in;
+                    flip_cos(0) <= '1';
+                    flip_sin(0) <= '0';
+                elsif angle_in < PI2_NEG then
+                    -- θ en [−π, −π/2): usar −π − θ, negar ambos
+                    ang_v       := -PI_Q13 - angle_in;
+                    flip_cos(0) <= '1';
+                    flip_sin(0) <= '1';
+                else
+                    ang_v       := angle_in;
+                    flip_cos(0) <= '0';
+                    flip_sin(0) <= '0';
+                end if;
+                z_pipe(0) <= ang_v;
+            end if;
+        end if;
+    end process;
+
+    -- ----------------------------------------------------------
+    --  Etapas 1..N_ITER: rotaciones CORDIC (modo rotación)
+    --  x(i+1) = x(i) − d·y(i)·2^−i
+    --  y(i+1) = y(i) + d·x(i)·2^−i
+    --  z(i+1) = z(i) − d·arctan(2^−i)
+    --  donde d = sign(z(i))
+    -- ----------------------------------------------------------
+    GEN_STAGES: for i in 0 to N_ITER-1 generate
+        process(clk, rst)
+            variable x_sh : signed(N_BITS-1 downto 0);
+            variable y_sh : signed(N_BITS-1 downto 0);
+        begin
+            if rst = '1' then
+                x_pipe(i+1)     <= (others => '0');
+                y_pipe(i+1)     <= (others => '0');
+                z_pipe(i+1)     <= (others => '0');
+                valid_pipe(i+1) <= '0';
+                flip_cos(i+1)   <= '0';
+                flip_sin(i+1)   <= '0';
+            elsif rising_edge(clk) then
+                valid_pipe(i+1) <= valid_pipe(i);
+                flip_cos(i+1)   <= flip_cos(i);
+                flip_sin(i+1)   <= flip_sin(i);
+
+                x_sh := shift_right(x_pipe(i), i);
+                y_sh := shift_right(y_pipe(i), i);
+
+                if z_pipe(i) >= 0 then
+                    -- Rotar en sentido positivo
+                    x_pipe(i+1) <= x_pipe(i) - y_sh;
+                    y_pipe(i+1) <= y_pipe(i) + x_sh;
+                    z_pipe(i+1) <= z_pipe(i) - ATAN_TABLE(i);
+                else
+                    -- Rotar en sentido negativo
+                    x_pipe(i+1) <= x_pipe(i) + y_sh;
+                    y_pipe(i+1) <= y_pipe(i) - x_sh;
+                    z_pipe(i+1) <= z_pipe(i) + ATAN_TABLE(i);
+                end if;
+            end if;
+        end process;
+    end generate GEN_STAGES;
+
+    -- ----------------------------------------------------------
+    --  Salidas: aplicar correcciones de cuadrante
+    --  cos_out = x_pipe(N_ITER) × (−1 si flip_cos)
+    --  sin_out = y_pipe(N_ITER) × (−1 si flip_sin)
+    --  El shift_right(K,1) inicial se compensa porque la salida
+    --  está en el rango correcto para Q2.13 (|sin|,|cos| ≤ 1)
+    -- ----------------------------------------------------------
+    cos_out <= -shift_left(x_pipe(N_ITER), 1) when flip_cos(N_ITER) = '1'
+               else shift_left(x_pipe(N_ITER), 1);
+
+    sin_out <= -shift_left(y_pipe(N_ITER), 1) when flip_sin(N_ITER) = '1'
+               else shift_left(y_pipe(N_ITER), 1);
+
+    done <= valid_pipe(N_ITER);
+
+end pipeline;

@@ -1,0 +1,205 @@
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity Block2R_tb is
+end Block2R_tb;
+
+architecture sim of Block2R_tb is
+
+    -- Componente bajo prueba
+    component Block2R
+        port (
+            clk         : in  std_logic;
+            Reset       : in  std_logic;
+            StartALL    : in  std_logic;
+            L1          : in  std_logic_vector(15 downto 0);
+            L2          : in  std_logic_vector(15 downto 0);
+            One         : in  std_logic_vector(15 downto 0);
+            Px          : in  std_logic_vector(15 downto 0);
+            Py          : in  std_logic_vector(15 downto 0);
+            Two         : in  std_logic_vector(15 downto 0);
+            Tetha1Ready : out std_logic;
+            Theta2Ready : out std_logic;
+            Tetha1      : out std_logic_vector(15 downto 0);
+            Tetha2      : out std_logic_vector(15 downto 0)
+        );
+    end component;
+
+    -- ----------------------------------------------------------------
+    -- Formato Q2.13: valor_real * 2^13 = valor_real * 8192
+    -- Constantes del sistema
+    --   L1  = 0.5  → 0.5  * 8192 =  4096 = 0x1000
+    --   L2  = 0.4  → 0.4  * 8192 =  3277 = 0x0CCD
+    --   1.0        → 1.0  * 8192 =  8192 = 0x2000
+    --   2.0        → 2.0  * 8192 = 16384 = 0x4000
+    -- Casos de prueba (Px, Py) en Q2.13:
+    --   Caso 1: Px=0.5, Py=0.5  → θ1≈45°, θ2≈-algo
+    --   Caso 2: Px=0.7, Py=0.0  → robot extendido sobre X
+    --   Caso 3: Px=0.3, Py=0.6  → posición arriba-izquierda
+    -- ----------------------------------------------------------------
+
+    -- Señales de estímulo
+    signal clk_s         : std_logic := '0';
+    signal reset_s       : std_logic := '1';
+    signal startall_s    : std_logic := '0';
+    signal L1_s          : std_logic_vector(15 downto 0) := x"1000"; -- 0.5
+    signal L2_s          : std_logic_vector(15 downto 0) := x"0CCD"; -- 0.4
+    signal One_s         : std_logic_vector(15 downto 0) := x"2000"; -- 1.0
+    signal Two_s         : std_logic_vector(15 downto 0) := x"4000"; -- 2.0
+    signal Px_s          : std_logic_vector(15 downto 0) := (others => '0');
+    signal Py_s          : std_logic_vector(15 downto 0) := (others => '0');
+
+    -- Señales de salida
+    signal theta1_ready_s : std_logic;
+    signal theta2_ready_s : std_logic;
+    signal theta1_s       : std_logic_vector(15 downto 0);
+    signal theta2_s       : std_logic_vector(15 downto 0);
+
+    -- Periodo de reloj: 10 ns → 100 MHz
+    constant CLK_PERIOD : time := 10 ns;
+
+    -- Función auxiliar: convierte Q2.13 signed a real (solo para report)
+    function q213_to_real(v : std_logic_vector(15 downto 0)) return real is
+        variable s : signed(15 downto 0);
+    begin
+        s := signed(v);
+        return real(to_integer(s)) / 8192.0;
+    end function;
+
+begin
+
+    -- ----------------------------------------------------------------
+    -- Instancia del DUT
+    -- ----------------------------------------------------------------
+    DUT : Block2R
+        port map (
+            clk         => clk_s,
+            Reset       => reset_s,
+            StartALL    => startall_s,
+            L1          => L1_s,
+            L2          => L2_s,
+            One         => One_s,
+            Px          => Px_s,
+            Py          => Py_s,
+            Two         => Two_s,
+            Tetha1Ready => theta1_ready_s,
+            Theta2Ready => theta2_ready_s,
+            Tetha1      => theta1_s,
+            Tetha2      => theta2_s
+        );
+
+    -- ----------------------------------------------------------------
+    -- Generador de reloj
+    -- ----------------------------------------------------------------
+    clk_s <= not clk_s after CLK_PERIOD / 2;
+
+    -- ----------------------------------------------------------------
+    -- Proceso de estímulos
+    -- ----------------------------------------------------------------
+    stim_proc : process
+    begin
+        -- ============================================================
+        -- RESET inicial
+        -- ============================================================
+        reset_s    <= '1';
+        startall_s <= '0';
+        wait for 5 * CLK_PERIOD;
+        reset_s    <= '0';
+        wait for 2 * CLK_PERIOD;
+
+        -- ============================================================
+        -- CASO 1: Px = 0.5, Py = 0.5
+        --   Resultado esperado aproximado (radianes en Q2.13):
+        --   θ2 ≈ -0.8957 rad  →  -7342  → 0xE312
+        --   θ1 ≈  1.3734 rad  →  11262  → 0x2BFE
+        -- ============================================================
+        report "=== CASO 1: Px=0.5, Py=0.5 ===" severity note;
+        Px_s       <= std_logic_vector(to_signed(4096, 16));  -- 0.5
+        Py_s       <= std_logic_vector(to_signed(4096, 16));  -- 0.5
+        startall_s <= '1';
+        wait for CLK_PERIOD;
+        startall_s <= '0';
+
+        -- Esperar hasta que theta1 esté listo (máximo 500 ciclos)
+        wait until theta1_ready_s = '1' for 500 * CLK_PERIOD;
+
+        if theta1_ready_s = '1' then
+            report "CASO 1 OK → theta1 = " &
+                   integer'image(to_integer(signed(theta1_s))) &
+                   "  theta2 = " &
+                   integer'image(to_integer(signed(theta2_s)))
+                   severity note;
+        else
+            report "CASO 1 TIMEOUT — theta1Ready nunca se activó" severity error;
+        end if;
+
+        wait for 10 * CLK_PERIOD;
+        reset_s <= '1';
+        wait for 3 * CLK_PERIOD;
+        reset_s <= '0';
+        wait for 2 * CLK_PERIOD;
+
+        -- ============================================================
+        -- CASO 2: Px = 0.7, Py = 0.0  (robot casi extendido sobre X)
+        --   θ2 ≈ -1.176 rad  →  -9633  → 0xDA5F
+        --   θ1 ≈  0.588 rad  →   4816  → 0x12D0
+        -- ============================================================
+        report "=== CASO 2: Px=0.7, Py=0.0 ===" severity note;
+        Px_s       <= std_logic_vector(to_signed(5734, 16));  -- 0.7 * 8192
+        Py_s       <= std_logic_vector(to_signed(0,    16));  -- 0.0
+        startall_s <= '1';
+        wait for CLK_PERIOD;
+        startall_s <= '0';
+
+        wait until theta1_ready_s = '1' for 500 * CLK_PERIOD;
+
+        if theta1_ready_s = '1' then
+            report "CASO 2 OK → theta1 = " &
+                   integer'image(to_integer(signed(theta1_s))) &
+                   "  theta2 = " &
+                   integer'image(to_integer(signed(theta2_s)))
+                   severity note;
+        else
+            report "CASO 2 TIMEOUT — theta1Ready nunca se activó" severity error;
+        end if;
+
+        wait for 10 * CLK_PERIOD;
+        reset_s <= '1';
+        wait for 3 * CLK_PERIOD;
+        reset_s <= '0';
+        wait for 2 * CLK_PERIOD;
+
+        -- ============================================================
+        -- CASO 3: Px = 0.3, Py = 0.6
+        --   θ2 ≈  0.6797 rad  →   5570  → 0x15C2
+        --   θ1 ≈  1.3734 rad  →  11262  → 0x2BFE  (aprox)
+        -- ============================================================
+        report "=== CASO 3: Px=0.3, Py=0.6 ===" severity note;
+        Px_s       <= std_logic_vector(to_signed(2458, 16));  -- 0.3 * 8192
+        Py_s       <= std_logic_vector(to_signed(4915, 16));  -- 0.6 * 8192
+        startall_s <= '1';
+        wait for CLK_PERIOD;
+        startall_s <= '0';
+
+        wait until theta1_ready_s = '1' for 500 * CLK_PERIOD;
+
+        if theta1_ready_s = '1' then
+            report "CASO 3 OK → theta1 = " &
+                   integer'image(to_integer(signed(theta1_s))) &
+                   "  theta2 = " &
+                   integer'image(to_integer(signed(theta2_s)))
+                   severity note;
+        else
+            report "CASO 3 TIMEOUT — theta1Ready nunca se activó" severity error;
+        end if;
+
+        -- ============================================================
+        -- Fin de la simulación
+        -- ============================================================
+        wait for 20 * CLK_PERIOD;
+        report "=== SIMULACIÓN COMPLETA ===" severity note;
+        wait;
+    end process;
+
+end sim;
