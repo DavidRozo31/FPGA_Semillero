@@ -19,14 +19,17 @@ línea por línea.
 | 8 | [MATLAB_Peter_Corke_Cinematica](8_MATLAB_Peter_Corke_Cinematica/README.md) | Simulación y verificación con el Robotics Toolbox de Peter Corke | MATLAB |
 | 9 | [Control_Servos_UART](9_Control_Servos_UART/README.md) | De 1 a 6 servomotores controlados por UART (hardware + GUIs en Python) | FPGA — aplicación |
 | 10 | [Diseno_CAD_SolidWorks](10_Diseno_CAD_SolidWorks/README.md) | Referencia del diseño mecánico del brazo físico | CAD — referencia |
+| 11 | [Cinematica_Directa_Geometrica](11_Cinematica_Directa_Geometrica/README.md) | Cinemática directa 5R (posición + orientación) por método geométrico — mismo resultado que la lección 7, una fracción de los recursos lógicos | FPGA — cinemática |
 
 ### Orden de lectura recomendado
 
-`1 → 2 → 3 → 4 → 5 (opcional/histórico) → 6 → 7 → 8 → 9 → 10`
+`1 → 2 → 3 → 4 → 5 (opcional/histórico) → 6 → 7 → 8 → 9 → 10 → 11`
 
 Las lecciones 1-4 sientan las bases del lenguaje y las herramientas. La lección 5 documenta
 un intento anterior de cinemática **inversa** (ya no es la arquitectura activa del robot 2R,
-pero sus operadores aritméticos se reutilizan en las lecciones 6 y 7). Las lecciones 6-8 son
+pero sus operadores aritméticos se reutilizan en las lecciones 6, 7 y 11). Las lecciones 6-8 son
 el núcleo del semillero: cinemática **directa** por los dos métodos clásicos, con su
 contraparte de verificación en MATLAB. Las lecciones 9-10 documentan cómo ese cálculo se
-traduce en movimiento físico del brazo.
+traduce en movimiento físico del brazo. La lección 11 retoma la cinemática directa de la
+lección 7 con un método distinto (geométrico en vez de DH), motivada por que ese diseño no
+cabía en la FPGA del semillero — mismo robot, mismo resultado, una fracción de los recursos.
