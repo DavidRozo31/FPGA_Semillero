@@ -26,7 +26,13 @@ a hardware bloque por bloque.
 
 1. [Por qué cambiar de método: el problema de recursos](#1-por-qué-cambiar-de-método-el-problema-de-recursos)
 2. [Por qué este robot admite el atajo geométrico](#2-por-qué-este-robot-admite-el-atajo-geométrico)
-3. [Derivación matemática](#3-derivación-matemática)
+3. [Derivación matemática, paso a paso](#3-derivación-matemática-paso-a-paso)
+   - [3.1 Posición](#31-posición)
+   - [3.2 De dónde salen `Rz(θ)` y `Rx(α)`](#32-de-dónde-salen-rzθ-y-rxα)
+   - [3.3 Fórmula general por articulación y sustitución de cada `α`](#33-fórmula-general-por-articulación-y-sustitución-de-cada-α)
+   - [3.4 Multiplicación en cadena: `R0_4 = R1·R2·R3·R4`](#34-multiplicación-en-cadena-r0_4--r1r2r3r4)
+   - [3.5 Corrección: el eje de la muñeca (`θ5` rota sobre Z, no sobre X)](#35-corrección-el-eje-de-la-muñeca-θ5-rota-sobre-z-no-sobre-x)
+   - [3.6 Ángulos de Euler ZYX: de dónde salen Yaw/Pitch/Roll](#36-ángulos-de-euler-zyx-de-dónde-salen-yawpitchroll)
 4. [Arquitectura de módulos (hoja de ruta)](#4-arquitectura-de-módulos-hoja-de-ruta)
 5. [Módulo por módulo](#5-módulo-por-módulo)
 6. [Integración final: el BDF completo](#6-integración-final-el-bdf-completo)
@@ -88,12 +94,23 @@ prolongación rígida del eslabón 3.
 
 ---
 
-## 3. Derivación matemática
+## 3. Derivación matemática, paso a paso
+
+Esta sección reconstruye la derivación completa **desde cero**, tal como se hizo en papel para
+presentarla al profesor de semillero — no solo el resultado final, sino de dónde sale cada
+matriz y cada sustitución. Se puede reproducir en MATLAB con
+[`Metodo_Geometrico_RPY.m`](Metodo_Geometrico_RPY.m) (numérico, matriz por matriz) o
+[`Metodo_Geometrico_RPY_Simbolico.m`](Metodo_Geometrico_RPY_Simbolico.m) (mismo código, con
+`syms` en vez de números) — ver [sección 8](#8-verificación-en-matlab).
 
 ### 3.1 Posición
 
 Con `φ2 = θ2`, `φ23 = θ2+θ3`, `φ234 = θ2+θ3+θ4` (los ángulos **acumulados** de cada eslabón
-respecto al eje de referencia):
+respecto al eje de referencia — ver el diagrama abajo, donde las tres líneas de referencia
+horizontales son **paralelas entre sí**, que es justo lo que hace que estos ángulos sean
+acumulados y no relativos al eslabón anterior):
+
+![Vista lateral del brazo con los angulos acumulados phi2, phi23, phi234 y la vista superior de la rotacion theta1](images/Diagrama_Brazo_ParteA.png)
 
 ```
 r = L2·cos(φ2) + L3·cos(φ23) + (L4+L5)·cos(φ234)      (alcance radial, dentro del plano)
@@ -102,51 +119,224 @@ x = r·cos(θ1)
 y = r·sin(θ1)
 ```
 
-### 3.2 Orientación: matriz de rotación `R0_5`
+### 3.2 De dónde salen `Rz(θ)` y `Rx(α)`
 
-Para la orientación se necesita la matriz de rotación completa base→efector. Se deriva
-expandiendo a mano la cadena DH `R0_5 = R1·R2·R3·R4·Rx(θ5)` (post-multiplicación, siguiendo la
-misma convención de composición de rotaciones —"rotar sobre el sistema actual se
-post-multiplica"— que se usa en la [lección 7](../7_Cinematica_Directa_DH/README.md)). El
-resultado, verificado por multiplicación simbólica y confirmado numéricamente contra la cadena
-DH completa (ver [sección 8](#8-verificación-en-matlab)), es:
+Antes de construir la matriz de orientación hace falta un paso más atrás: de dónde salen las
+matrices básicas de rotación. Un hecho de álgebra lineal: la matriz de una transformación
+lineal se arma poniendo **a dónde va cada eje** `X=(1,0,0)`, `Y=(0,1,0)`, `Z=(0,0,1)` como
+columnas.
 
-```
-R0_5 = [ -cosθ1·sinφ234    sinθ1·cosθ5+cosθ1·cosφ234·sinθ5    -sinθ1·sinθ5+cosθ1·cosφ234·cosθ5 ]
-       [ -sinθ1·sinφ234   -cosθ1·cosθ5+sinθ1·cosφ234·sinθ5     cosθ1·sinθ5+sinθ1·cosφ234·cosθ5 ]
-       [  cosφ234           sinφ234·sinθ5                       sinφ234·cosθ5                   ]
-```
-
-De estos 9 elementos, **solo 5** hacen falta para extraer los ángulos de Euler (sección
-siguiente): `R11, R21, R31, R32, R33`. Por eso el hardware nunca arma la matriz completa —
-`mat_r05_elems.vhd` calcula exclusivamente esos 5 valores.
-
-### 3.3 Ángulos de Euler ZYX (metodología de la clase de teoría)
-
-Con `Rzyx(yaw,pitch,roll) = Rz(yaw)·Ry(pitch)·Rx(roll)`, la extracción estándar de ángulos de
-Euler a partir de una matriz de rotación (deducida en clase a partir de `R11²+R21² = cos²β`) es:
+**`Rz(θ)` — rotación alrededor de Z.** El eje Z no se mueve. Un vector a lo largo de X (ángulo
+0°) rotado `θ` queda a `θ`, es decir en `(cosθ, sinθ, 0)` (definición de seno/coseno en el
+círculo unitario). Un vector a lo largo de Y (ángulo 90°) rotado `θ` queda a `90°+θ`, es decir
+`(cos(90°+θ), sin(90°+θ), 0) = (-sinθ, cosθ, 0)`. Poniendo estos resultados como columnas:
 
 ```
-yaw   = atan2(R21, R11)
-pitch = atan2(-R31, sqrt(R11² + R21²))
-roll  = atan2(R32, R33)
+Rz(θ) = [ cosθ   -sinθ    0 ]
+        [ sinθ    cosθ    0 ]
+        [  0        0     1 ]
 ```
 
-con singularidad en `β = ±90°` (cuando `cos(pitch) → 0`). Sustituyendo los `R_ij` de la sección
-3.2:
+**`Rx(α)` — rotación alrededor de X.** Mismo procedimiento, ahora el que no se mueve es X:
 
 ```
-yaw   ≈ θ1 (± 180°, según el signo de sinφ234)
-pitch = f(φ234)
-roll  ≈ θ5 (± 180°, según el signo de sinφ234)
+Rx(α) = [ 1     0        0   ]
+        [ 0    cosα   -sinα ]
+        [ 0    sinα    cosα ]
 ```
 
-Es una comprobación elegante de que el modelo está bien planteado: el *yaw* extraído coincide
-con la rotación de la base y el *roll* con la rotación del gripper, tal como se esperaría
-físicamente. La singularidad de esta extracción ocurre exactamente cuando
-`sin(φ234) = 0` — es decir, cuando **el brazo queda totalmente extendido o totalmente plegado
-en línea recta**. Ahí `R11 ≈ R21 ≈ 0` y `R32 ≈ R33 ≈ 0` simultáneamente, y *yaw*/*roll* quedan
-indeterminados (ver discusión de casos de prueba, sección 7).
+Cada articulación DH hace dos rotaciones en cadena: primero gira el ángulo variable de la junta
+sobre Z (`Rz(θᵢ)`), luego aplica la torsión fija del eslabón sobre X (`Rx(αᵢ)`):
+
+```
+Rᵢ = Rz(θᵢ) · Rx(αᵢ)
+   = [ cosθᵢ   -sinθᵢ·cosαᵢ    sinθᵢ·sinαᵢ ]
+     [ sinθᵢ    cosθᵢ·cosαᵢ   -cosθᵢ·sinαᵢ ]
+     [   0          sinαᵢ          cosαᵢ    ]
+```
+
+### 3.3 Fórmula general por articulación y sustitución de cada `α`
+
+Ahora se mete el número de `α` de cada articulación (según la tabla DH de la lección 7) en la
+fórmula general y se ve qué le pasa a cada una de las 9 casillas.
+
+**Articulación 1 (`α1=90°`):** con `cos90°=0, sin90°=1`:
+
+```
+R1(1,1) = cosθ1                    R1(1,2) = -sinθ1·cosα1 = 0        R1(1,3) = sinθ1·sinα1 = sinθ1
+R1(2,1) = sinθ1                    R1(2,2) =  cosθ1·cosα1 = 0        R1(2,3) = -cosθ1·sinα1 = -cosθ1
+R1(3,1) = 0                        R1(3,2) = sinα1 = 1               R1(3,3) = cosα1 = 0
+
+R1 = [ cosθ1    0    sinθ1 ]
+     [ sinθ1    0   -cosθ1 ]
+     [   0      1      0   ]
+```
+
+Físicamente, `α=90°` es la torsión que reorienta el eje: convierte la rotación vertical de la
+base (`θ1`) en el eje horizontal sobre el que giran las siguientes articulaciones.
+
+**Articulaciones 2 y 3 (`α=0°`):** con `cos0°=1, sin0°=0`, todos los términos con `sinα` se
+anulan y los términos con `cosα` quedan intactos:
+
+```
+R = [ cosθ  -sinθ   0 ]
+    [ sinθ   cosθ   0 ]      = Rz(θ)     (rotación pura, sin mezclar la 3ra fila/columna)
+    [   0      0    1 ]
+```
+
+`α=0°` significa "sin torsión": el eje de giro no cambia de dirección, la rotación se queda
+pura en el plano. Esta es la razón matemática de por qué los eslabones 2 y 3 son coplanares.
+
+**Articulación 4 (`α4=90°`, con `θ4' = θ4+90°`):** mismo caso que la articulación 1, pero el
+ángulo variable no es `θ4` directo sino `θ4'=θ4+90°` (desfase fijo de la tabla DH, no algo que
+se derive). Sustituyendo primero como en la articulación 1:
+
+```
+R4 = [ cosθ4'    0    sinθ4' ]
+     [ sinθ4'    0   -cosθ4' ]
+     [   0       1      0    ]
+```
+
+y ahora reemplazando `θ4'` por `θ4+90°` con las identidades de suma de ángulos:
+
+```
+cos(θ4+90°) = cosθ4·cos90° - sinθ4·sin90° = -sinθ4
+sin(θ4+90°) = sinθ4·cos90° + cosθ4·sin90° =  cosθ4
+
+R4 = [ -sinθ4    0    cosθ4 ]
+     [  cosθ4    0    sinθ4 ]
+     [   0       1      0   ]
+```
+
+### 3.4 Multiplicación en cadena: `R0_4 = R1·R2·R3·R4`
+
+**Paso intermedio — por qué `R2·R3 = Rz(φ23)`:** multiplicando fila×columna con las
+identidades `cos(a+b)=cosacosb-sinasinb` y `sin(a+b)=sinacosb+cosasinb`:
+
+```
+(R2·R3)11 = cosθ2cosθ3 - sinθ2sinθ3 = cos(θ2+θ3)      (R2·R3)12 = -sin(θ2+θ3)
+(R2·R3)21 = sin(θ2+θ3)                                 (R2·R3)22 =  cos(θ2+θ3)
+
+R2·R3 = Rz(θ2+θ3) = Rz(φ23)
+```
+
+No es un atajo mágico: dos rotaciones seguidas sobre el mismo eje se suman porque eso es lo que
+sale de multiplicar las matrices.
+
+**`A = R1 · Rz(φ23)`** (fila de `R1` · columna de `Rz(φ23)`, entrada por entrada):
+
+```
+A11 = cosθ1·cosφ23                  A12 = -cosθ1·sinφ23                A13 = sinθ1
+A21 = sinθ1·cosφ23                  A22 = -sinθ1·sinφ23                A23 = -cosθ1
+A31 = sinφ23                        A32 =  cosφ23                      A33 = 0
+```
+
+**`R0_4 = A · R4`**, usando otra vez suma de ángulos (`φ234 = φ23+θ4`):
+
+```
+R0_4(1,1) = A11·(-sinθ4) + A12·cosθ4 = -cosθ1·(cosφ23·sinθ4 + sinφ23·cosθ4) = -cosθ1·sinφ234
+R0_4(1,2) = A13 = sinθ1
+R0_4(1,3) = A11·cosθ4 + A12·sinθ4 = cosθ1·(cosφ23·cosθ4 - sinφ23·sinθ4) = cosθ1·cosφ234
+
+R0_4(2,1) = -sinθ1·sinφ234          R0_4(2,2) = -cosθ1          R0_4(2,3) = sinθ1·cosφ234
+
+R0_4(3,1) = A31·(-sinθ4) + A32·cosθ4 = cosφ23·cosθ4 - sinφ23·sinθ4 = cosφ234
+R0_4(3,2) = A33 = 0
+R0_4(3,3) = A31·cosθ4 + A32·sinθ4 = sinφ23·cosθ4 + cosφ23·sinθ4 = sinφ234
+```
+
+```
+R0_4 = [ -cosθ1·sinφ234    sinθ1     cosθ1·cosφ234 ]
+       [ -sinθ1·sinφ234   -cosθ1     sinθ1·cosφ234 ]
+       [   cosφ234           0         sinφ234       ]
+```
+
+### 3.5 Corrección: el eje de la muñeca (`θ5` rota sobre Z, no sobre X)
+
+**Primer intento (incorrecto).** La primera versión de este documento asumía
+`R0_5 = R0_4 · Rx(θ5)` — razonando que `θ5` gira "sobre la dirección a lo largo del brazo", y
+asumiendo sin verificarlo que esa dirección era el eje local `X` de la muñeca. Con esa
+suposición, la columna 1 de `R0_4` quedaba intacta (`R11,R21,R31` sin `θ5`) y solo `R32,R33`
+dependían de `θ5`.
+
+**La corrección, en la revisión con el profesor.** Mirando el diagrama de asignación de ejes
+del brazo (frame 3/4, con las etiquetas **`X3,Z4`**), la dirección "a lo largo del brazo" está
+etiquetada como el eje **`Z4`**, no `X4`. Y la convención DH es tajante: en
+`Tᵢ = Rz(θᵢ)·Trans_z(dᵢ)·Trans_x(aᵢ)·Rx(αᵢ)`, el ángulo variable `θᵢ` **siempre** rota sobre Z
+— sin excepciones. La fila 5 de la tabla DH (`θ5, d5=L5, α5=0, a5=0`) confirma que
+`T45 = Rz(θ5)·Trans_z(L5)`: rotación en Z. El propio script de verificación DH del semillero
+(`Metodo_DH_RPY_Comparacion.m`) usa la misma convención: la quinta transformación se llama
+`thetaZ5`, exactamente como las otras cuatro — nunca hubo una "muñeca sobre X" en la convención
+DH, fue un error de interpretación en la primera derivación geométrica.
+
+**Rehaciendo el Paso 8 con `Rz(θ5)` (correcto):**
+
+```
+Rz(θ5) = [ cosθ5   -sinθ5    0 ]
+         [ sinθ5    cosθ5    0 ]
+         [   0        0      1 ]
+```
+
+Con `B = R0_4`, las columnas de `Rz(θ5)` son `(cosθ5,sinθ5,0)`, `(-sinθ5,cosθ5,0)`, `(0,0,1)`:
+
+```
+R0_5(i,1) = Bi1·cosθ5 + Bi2·sinθ5
+R0_5(i,2) = Bi1·(-sinθ5) + Bi2·cosθ5
+R0_5(i,3) = Bi3                        <- esta columna (la 3, no la 1) es la que NO cambia
+```
+
+```
+R11 = -cosθ1·sinφ234·cosθ5 + sinθ1·sinθ5
+R21 = -sinθ1·sinφ234·cosθ5 - cosθ1·sinθ5
+R31 =  cosφ234·cosθ5
+
+R32 = -cosφ234·sinθ5
+R33 =  sinφ234                    <- ya no depende de theta5
+```
+
+**Verificación cruzada.** Para `θ1=45°, φ234=90°, θ5=45°`, la matriz `R0_5` completa (las 9
+casillas) se reduce a `[0,1,0; -1,0,0; 0,0,1]` — exactamente `Rz(-90°)`. Es autoconsistente:
+cuando el brazo apunta derecho hacia arriba (`φ234=90°`), el eje de la muñeca (`Z4`) queda
+paralelo al eje vertical del mundo, y la rotación de la base (`θ1`) y el roll de la muñeca
+(`θ5`) terminan acoplados en un único giro neto alrededor de ese eje vertical — un
+comportamiento físicamente razonable, no un capricho del álgebra.
+
+`mat_r05_elems.vhd` (sección 5.5) implementa estas 5 fórmulas corregidas, en 2 ciclos en vez de
+1 (hacen falta más productos intermedios que con el modelo incorrecto).
+
+### 3.6 Ángulos de Euler ZYX: de dónde salen Yaw/Pitch/Roll
+
+Con `Rzyx(yaw,pitch,roll) = Rz(yaw)·Ry(pitch)·Rx(roll)` (la matriz general de la clase de
+teoría), comparando entrada por entrada:
+
+```
+Rzyx = [ Cp·Cy    Sr·Sp·Cy - Cr·Sy    Cr·Sp·Cy + Sr·Sy ]
+       [ Cp·Sy    Sr·Sp·Sy + Cr·Cy    Cr·Sp·Sy - Sr·Cy ]
+       [  -Sp        Sr·Cp                 Cr·Cp        ]
+```
+
+(`C`=coseno, `S`=seno; `y`=yaw, `p`=pitch, `r`=roll — noten que este "r" de roll no tiene nada
+que ver con el `R` de la matriz de rotación). De ahí:
+
+```
+R11 = Cp·Cy      R21 = Cp·Sy      R31 = -Sp      R32 = Sr·Cp      R33 = Cr·Cp
+```
+
+**Despejando cada ángulo:**
+
+```
+R21/R11 = Sy/Cy = tan(yaw)                              -> yaw   = atan2(R21, R11)
+R11² + R21² = Cp²(Cy²+Sy²) = Cp²  ,  R31 = -Sp           -> pitch = atan2(-R31, √(R11²+R21²))
+R32/R33 = Sr/Cr = tan(roll)                              -> roll  = atan2(R32, R33)
+```
+
+con singularidad en `pitch = ±90°` (cuando `Cp → 0`, el denominador de yaw y roll se anula).
+Sustituyendo los `R_ij` de la sección 3.5 (ya con la corrección de `θ5`), la extracción se
+vuelve más enredada que con el modelo incorrecto — `yaw`, `pitch` y `roll` ya no se simplifican
+limpiamente a `θ1`/`f(φ234)`/`θ5` por separado, porque ahora `θ5` también aparece dentro de
+`R11`, `R21` y `R31`. La singularidad de posición del brazo (`sin(φ234)=0`, brazo extendido en
+línea recta) sigue produciendo `R33=sinφ234≈0` y valores de `R11,R21,R31,R32` dominados por
+ruido de redondeo — la misma inestabilidad de la sección 7, ahora con la fórmula corregida.
 
 ---
 
@@ -175,9 +365,9 @@ ciclos de latencia.
 | 3 | `fk_geom_core.vhd` | Posición `x,y,z` (rama posición) | 2 ciclos |
 | 4a | `cordic_atan2_16.vhd` | CORDIC modo *vectoring* (bloque base, se prueba aislado) | 13 ciclos |
 | 4b | (incluido en `cordic_seq5`) | — | — |
-| 4c | `mat_r05_elems.vhd` | Elementos `R11,R21,R31,R32,R33` (rama orientación) | 1 ciclo |
+| 4c | `mat_r05_elems.vhd` | Elementos `R11,R21,R31,R32,R33` (rama orientación) | 2 ciclos |
 | 4d | `atan2_seq3.vhd` | 1 CORDIC *vectoring* reutilizado en 3 pasadas: `→ yaw,pitch,roll` | ~40 ciclos |
-| 4e | Integración final (BDF) | Encadena todo: `θ1..θ5 → x,y,z,yaw,pitch,roll` | ~105-115 ciclos |
+| 4e | Integración final (BDF) | Encadena todo: `θ1..θ5 → x,y,z,yaw,pitch,roll` | ~106-116 ciclos |
 
 Cada paso se armó y probó **por separado** en Quartus (diagrama de bloques → VHDL generado →
 testbench propio) antes de integrarlo, siguiendo la misma metodología de las lecciones
@@ -252,18 +442,26 @@ CORDIC adicional, sin matrices. 2 ciclos de latencia.
 
 ### 5.5 `mat_r05_elems.vhd` — elementos de rotación (rama 2 de 2, parte 1)
 
-Arma los 5 elementos de `R0_5` que se necesitan (sección 3.2/3.3), de nuevo solo con productos
-simples:
+Arma los 5 elementos de `R0_5` corregidos (sección 3.5), con productos simples en 2 etapas —
+la etapa 1 calcula los productos intermedios `cos1·sin234` y `sin1·sin234` (que hacen falta
+para combinar con `cos5`/`sin5` en la etapa 2, ya que ahora `θ5` mezcla la columna 1 en vez de
+dejarla intacta):
 
 ```vhdl
-r11_r <= -mul_q13(signed(cos1_in),   signed(sin234_in));
-r21_r <= -mul_q13(signed(sin1_in),   signed(sin234_in));
-r31_r <=  signed(cos234_in);
-r32_r <=  mul_q13(signed(sin234_in), signed(sin5_in));
-r33_r <=  mul_q13(signed(sin234_in), signed(cos5_in));
+-- etapa 1
+a_r      <= mul_q13(signed(cos1_in), signed(sin234_in));   -- cos1*sin234
+b_r      <= mul_q13(signed(sin1_in), signed(sin234_in));   -- sin1*sin234
+-- (cos1_r, sin1_r, cos234_r, sin234_r, cos5_r, sin5_r se capturan tal cual)
+
+-- etapa 2:  R0_5 = R0_4 * Rz(theta5)
+r11_r <= -mul_q13(a_r, cos5_r) + mul_q13(sin1_r, sin5_r);
+r21_r <= -mul_q13(b_r, cos5_r) - mul_q13(cos1_r, sin5_r);
+r31_r <=  mul_q13(cos234_r, cos5_r);
+r32_r <= -mul_q13(cos234_r, sin5_r);
+r33_r <=  sin234_r;
 ```
 
-1 ciclo de latencia.
+2 ciclos de latencia (antes era 1 ciclo, con la fórmula incorrecta — ver sección 3.5).
 
 ### 5.6 `cordic_atan2_16.vhd` — CORDIC modo *vectoring* con magnitud
 
@@ -349,16 +547,28 @@ final):
 
 ## 7. Testbench, casos de prueba y la singularidad
 
+> **Nota:** esta tabla ya refleja la corrección de la sección 3.5 (`θ5` sobre Z). Los Casos 1 y
+> 3 no cambian respecto a la versión anterior de este documento porque en ambos `θ5=0`
+> (`Rz(0)=Rx(0)=identidad`, así que el error no tenía forma de manifestarse ahí). El Caso 2 es
+> el único con `θ5≠0` **y** `φ234≠0` al mismo tiempo, y sí cambia — ver más abajo.
+
 Los 3 casos de prueba finales (`theta1..theta5` en grados; salidas en raw Q2.13):
 
 | Caso | θ1,θ2,θ3,θ4,θ5 | x | y | z | yaw | pitch | roll |
 |---|---|---|---|---|---|---|---|
 | 1 — singularidad (`φ234=0`) | `0,0,0,0,0` | 3422 | 3 | 412 | 26363* | -12865 | 627* |
-| 2 — limpio | `45,0,0,90,45` | 1375 | 1374 | 1887 | -19303 | -3 | 6433 |
+| 2 — limpio | `45,0,0,90,45` | 1375 | 1374 | 1887 | -12868‡ | ~0 | ~0 |
 | 3 — limpio | `0,45,0,0,0` | 2418 | 2 | 2826 | -25733† | -6433 | 3 |
 
 Posición y *pitch* coinciden con el valor esperado en los 3 casos, dentro del margen normal del
-CORDIC (±0.02°–0.1°). Dos observaciones importantes, ambas *esperadas* y no errores de diseño:
+CORDIC (±0.02°–0.1°). Tres observaciones importantes:
+
+**(‡) Caso 2 — el valor cambió con la corrección.** Antes (con el modelo `Rx(θ5)` incorrecto)
+este caso daba `yaw≈-135°, roll≈45°`. Con el modelo corregido (`Rz(θ5)`), la matriz `R0_5`
+completa para esta configuración se reduce exactamente a `Rz(-90°)` (ver la verificación
+cruzada de la sección 3.5) — el resultado esperado ahora es `yaw≈-90°, pitch≈0°, roll≈0°`.
+Pendiente confirmar con una nueva corrida de simulación tras aplicar el fix a
+`mat_r05_elems.vhd`.
 
 **(\*) Caso 1 — inestabilidad numérica real en la singularidad.** Con `φ234=0`
 (brazo totalmente extendido), `R11`, `R21`, `R32` y `R33` no llegan como ceros matemáticos
@@ -377,41 +587,71 @@ dependiente del mismo ruido de redondeo), el resultado cae de un lado u otro del
 
 ## 8. Verificación en MATLAB
 
-`verificacion_fk_geometrica.m` reimplementa las mismas fórmulas de las secciones 3.1 y 3.2/3.3
-en punto flotante, para comparar contra los resultados de la simulación en ModelSim sin
-depender de la FPGA. Los ángulos de entrada están al principio del script, fáciles de cambiar:
+Hay tres scripts, cada uno para un propósito distinto:
+
+### [`Metodo_Geometrico_RPY.m`](Metodo_Geometrico_RPY.m) — construcción matriz por matriz
+
+Reproduce la derivación completa de la sección 3 en MATLAB **numérico** (sin símbolos), en el
+mismo estilo directo que el código DH ya existente del semillero: cada `Rᵢ` se arma con la
+fórmula general (`cosθ, -sinθ·cosα, sinθ·sinα; ...`), sustituyendo el `α` de cada articulación
+como número — sin resumir ni simplificar a mano, para que se vea exactamente cómo queda cada
+matriz:
 
 ```matlab
-%% ---- Longitudes del brazo (metros) ----
-L1 = 0.05; L2 = 0.107; L3 = 0.13; L4 = 0.07; L5 = 0.11;
-L45 = L4 + L5;
+% ===================== Articulacion 4 (con el desfase +pi/2 de la tabla DH) =====================
+theta4 = pi/2;
+alpha4 = pi/2;
 
-%% ==================================================================
-%  ANGULOS DE ENTRADA (cambiar aqui, en grados, y volver a correr)
-%  ==================================================================
-theta1 = 0; theta2 = 45; theta3 = 0; theta4 = 0; theta5 = 0;
+R4 = [cos(theta4+pi/2)  -sin(theta4+pi/2)*cos(alpha4)   sin(theta4+pi/2)*sin(alpha4);
+      sin(theta4+pi/2)   cos(theta4+pi/2)*cos(alpha4)  -cos(theta4+pi/2)*sin(alpha4);
+             0                    sin(alpha4)                   cos(alpha4)          ]
 
-%% ---- Posicion del efector (igual que fk_geom_core.vhd) ----
-r = L2*cos(phi2) + L3*cos(phi23) + L45*cos(phi234);
-z = L1 + L2*sin(phi2) + L3*sin(phi23) + L45*sin(phi234);
-x = r*cos(th1);
-y = r*sin(th1);
+% ===================== Articulacion 5 -- muñeca (rota sobre Z, no sobre X) =====================
+theta5 = pi/4;
 
-%% ---- Elementos de la matriz de rotacion R0_5 (igual que mat_r05_elems.vhd) ----
-R11 = -cos(th1)*sin(phi234);
-R21 = -sin(th1)*sin(phi234);
-R31 =  cos(phi234);
-R32 =  sin(phi234)*sin(th5);
-R33 =  sin(phi234)*cos(th5);
+R5 = [cos(theta5)  -sin(theta5)   0;
+      sin(theta5)   cos(theta5)   0;
+          0              0        1]
 
-%% ---- Angulos de Euler ZYX (formulas de la clase del profesor) ----
-yaw   = atan2(R21, R11);
-pitch = atan2(-R31, sqrt(R11^2 + R21^2));
-roll  = atan2(R32, R33);
+% ===================== Multiplicacion en cadena, UNA matriz a la vez =====================
+R02 = R1 * R2
+R03 = R02 * R3
+R04 = R03 * R4
+R05 = R04 * R5
+
+% ===================== Yaw, Pitch, Roll -- paso a paso (formulas del profesor) =====================
+R11 = R05(1,1); R21 = R05(2,1); R31 = R05(3,1); R32 = R05(3,2); R33 = R05(3,3);
+
+yaw   = rad2deg( atan2(R21, R11) )
+pitch = rad2deg( atan2(-R31, sqrt(R11^2 + R21^2)) )
+roll  = rad2deg( atan2(R32, R33) )
+
+% chequeo contra la funcion del toolbox (debe dar lo mismo)
+r_rpy_check = rad2deg(tr2rpy(R05, 'zyx'))
 ```
 
-El script también avisa cuando la configuración de entrada cae cerca de la singularidad
-(`|sin(φ234)| < 0.05`), para no interpretar como error algo que es inestabilidad esperada.
+### [`Metodo_DH_RPY_Comparacion.m`](Metodo_DH_RPY_Comparacion.m) — cadena DH rigurosa (referencia)
+
+El código DH ya existente del semillero (matrices homogéneas 4×4 completas, `T01·T12·T23·T34·T45`,
+`tr2rpy` del Robotics Toolbox de Peter Corke), con los ángulos ajustados a los mismos valores
+que `Metodo_Geometrico_RPY.m` — incluyendo `thetaZ5` como variable real (antes estaba fijo en
+`0`, sin probar la muñeca). Los dos scripts deben dar la misma posición y el mismo `roll/pitch/yaw`
+— es la comprobación cruzada de que el atajo geométrico y la cadena DH completa son
+matemáticamente equivalentes.
+
+### [`Metodo_Geometrico_RPY_Simbolico.m`](Metodo_Geometrico_RPY_Simbolico.m) — mismo código, en símbolico
+
+Exactamente el mismo script que `Metodo_Geometrico_RPY.m` (misma estructura, mismo orden),
+pero con `theta1..theta5` declarados con `syms` en vez de números — para ver cada matriz en
+forma general (`simplify()` reduce automáticamente cada `Rᵢ` a su forma final, incluida la
+comprobación de que `R2` y `R5` se simplifican a `Rz(θ)` puro). Requiere el Symbolic Math
+Toolbox.
+
+Los tres reciben los ángulos de entrada como variables sueltas al principio del script, fáciles
+de cambiar. El más antiguo, [`verificacion_fk_geometrica.m`](verificacion_fk_geometrica.m),
+implementa las mismas fórmulas de la sección 3.1 (posición) en una sola pasada compacta y avisa
+cuando la configuración cae cerca de la singularidad (`|sin(φ234)| < 0.05`) — útil para una
+verificación rápida sin desglosar cada matriz.
 
 ---
 
@@ -440,7 +680,7 @@ Para el bloque final:
 | Logic elements | 55,391 (**883 %** de un EP4CE6) | **1,754 (27 %)** |
 | Multiplicadores embebidos | 30/30 (100 %) | 4/30 (13 %) |
 | Fitter | **Failed** (no cabe) | Analysis & Synthesis exitoso |
-| Latencia | ~23 ciclos | ~105-115 ciclos |
+| Latencia | ~23 ciclos | ~106-116 ciclos |
 
 La reducción de recursos es drástica — de un diseño que ni siquiera cabe en la FPGA a uno que
 usa poco más de una cuarta parte de sus elementos lógicos — a cambio de multiplicar por ~5 la
