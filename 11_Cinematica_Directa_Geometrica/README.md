@@ -330,13 +330,37 @@ R11² + R21² = Cp²(Cy²+Sy²) = Cp²  ,  R31 = -Sp           -> pitch = atan2(
 R32/R33 = Sr/Cr = tan(roll)                              -> roll  = atan2(R32, R33)
 ```
 
-con singularidad en `pitch = ±90°` (cuando `Cp → 0`, el denominador de yaw y roll se anula).
+con singularidad en `pitch = ±90°` (cuando `Cp → 0`, el denominador de yaw y roll se anula —
+es el clásico *gimbal lock*: en `pitch=±90°`, `Rz(yaw)·Ry(±90°)·Rx(roll)` se reduce a depender
+solo de `yaw+roll`, nunca de los dos por separado, así que hay infinitas parejas `(yaw,roll)`
+igualmente válidas para la misma orientación física — dos algoritmos distintos pueden repartir
+esa suma de forma diferente sin que ninguno esté "mal": la comprobación real no es que
+`yaw`/`roll` coincidan entre métodos, sino que `Rz(yaw)·Ry(pitch)·Rx(roll)` reconstruya la
+misma `R05` en cualquiera de los dos repartos).
+
 Sustituyendo los `R_ij` de la sección 3.5 (ya con la corrección de `θ5`), la extracción se
 vuelve más enredada que con el modelo incorrecto — `yaw`, `pitch` y `roll` ya no se simplifican
 limpiamente a `θ1`/`f(φ234)`/`θ5` por separado, porque ahora `θ5` también aparece dentro de
-`R11`, `R21` y `R31`. La singularidad de posición del brazo (`sin(φ234)=0`, brazo extendido en
-línea recta) sigue produciendo `R33=sinφ234≈0` y valores de `R11,R21,R31,R32` dominados por
-ruido de redondeo — la misma inestabilidad de la sección 7, ahora con la fórmula corregida.
+`R11`, `R21` y `R31`.
+
+**Condición exacta de la singularidad (corregida).** Como la columna 1 de cualquier matriz de
+rotación es un vector unitario, `R11²+R21²+R31²=1` siempre. Con `R31=cosφ234·cosθ5`:
+
+```
+R11² + R21² = 1 - (cosφ234·cosθ5)²
+```
+
+Esto se anula (la singularidad) únicamente cuando `cosφ234·cosθ5 = ±1` — y como ninguno de los
+dos factores puede pasar de 1 en magnitud, eso exige que **los dos sean `±1` al mismo tiempo**:
+
+```
+sin(φ234) = 0   Y   sin(θ5) = 0     (simultaneamente)
+```
+
+Es decir, el brazo extendido/plegado en línea recta **y** la muñeca en `θ5=0°` o `180°`, al
+mismo tiempo — no basta con que el brazo esté extendido si `θ5≠0,180°`. (Una versión anterior
+de este documento afirmaba que bastaba `sin(φ234)=0`; esa condición era la del modelo `Rx(θ5)`
+incorrecto de la sección 3.5, no la del modelo corregido.)
 
 ---
 
@@ -556,7 +580,7 @@ Los 3 casos de prueba finales (`theta1..theta5` en grados; salidas en raw Q2.13)
 
 | Caso | θ1,θ2,θ3,θ4,θ5 | x | y | z | yaw | pitch | roll |
 |---|---|---|---|---|---|---|---|
-| 1 — singularidad (`φ234=0`) | `0,0,0,0,0` | 3422 | 3 | 412 | 26363* | -12865 | 627* |
+| 1 — singularidad (`φ234=0` y `θ5=0`) | `0,0,0,0,0` | 3422 | 3 | 412 | 26363* | -12865 | 627* |
 | 2 — limpio | `45,0,0,90,45` | 1375 | 1374 | 1887 | -12868‡ | ~0 | ~0 |
 | 3 — limpio | `0,45,0,0,0` | 2418 | 2 | 2826 | -25733† | -6433 | 3 |
 
@@ -570,13 +594,22 @@ cruzada de la sección 3.5) — el resultado esperado ahora es `yaw≈-90°, pit
 Pendiente confirmar con una nueva corrida de simulación tras aplicar el fix a
 `mat_r05_elems.vhd`.
 
-**(\*) Caso 1 — inestabilidad numérica real en la singularidad.** Con `φ234=0`
-(brazo totalmente extendido), `R11`, `R21`, `R32` y `R33` no llegan como ceros matemáticos
-exactos sino como **residuos de redondeo del CORDIC** (`cos1`, `sin234`, etc. tienen su propio
-error de ±0.02°). El resultado es que `yaw`/`roll` calculan `atan2` de un vector prácticamente
-nulo, cuyo ángulo resultante es extremadamente sensible a ese ruido de redondeo — puede salir
-literalmente cualquier valor. Es la confirmación en hardware real del *gimbal lock* descrito en
-la sección 3.3, no un bug.
+**(\*) Caso 1 — inestabilidad numérica real en la singularidad.** Con `φ234=0` y `θ5=0`
+(la condición doble de la sección 3.6), `R11`, `R21`, `R32` y `R33` no llegan como ceros
+matemáticos exactos sino como **residuos de redondeo del CORDIC** (`cos1`, `sin234`, etc.
+tienen su propio error de ±0.02°). El resultado es que `yaw`/`roll` calculan `atan2` de un
+vector prácticamente nulo, cuyo ángulo resultante es extremadamente sensible a ese ruido de
+redondeo — puede salir literalmente cualquier valor. Esto pasa incluso en MATLAB de doble
+precisión (por el truncamiento de `π/2`, ver más abajo), no es exclusivo del hardware.
+
+En esta singularidad, `yaw` y `roll` individuales **no son verificables** entre distintos
+métodos — solo `yaw+roll` lo es (sección 3.6 explica por qué). La forma correcta de validar
+un caso así (sugerida por el profesor del semillero) no es comparar `yaw`/`roll` directo, sino
+**reconstruir** `Rz(yaw)·Ry(pitch)·Rx(roll)` con los ángulos obtenidos y verificar que
+reproduce la misma `R05` — ver `Metodo_Geometrico_RPY.m`, bloque final. Si el error de
+reconstrucción da ~0, la extracción es correcta aunque el reparto `yaw`/`roll` no coincida con
+otro algoritmo (p. ej. `tr2rpy`). Es la confirmación en hardware real del *gimbal lock*
+descrito en la sección 3.6, no un bug.
 
 **(†) Caso 3 — el corte de ±180°.** `+180°` y `-180°` son el mismo ángulo físico (es el punto
 de discontinuidad de `atan2`). Como aquí `R11` es muy negativo y `R21` casi cero (con signo
