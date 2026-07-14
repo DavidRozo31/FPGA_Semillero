@@ -66,7 +66,7 @@ R31 = R05(3,1);
 R32 = R05(3,2);
 R33 = R05(3,3);
 
-yaw   = simplify( atan2(R21, R11) )
+yaw   = atan2(R21, R11)
 
 pitch = simplify( atan2(-R31, sqrt(R11^2 + R21^2)) )
 

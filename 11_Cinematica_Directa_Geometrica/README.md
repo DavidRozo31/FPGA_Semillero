@@ -33,6 +33,7 @@ a hardware bloque por bloque.
    - [3.4 Multiplicación en cadena: `R0_4 = R1·R2·R3·R4`](#34-multiplicación-en-cadena-r0_4--r1r2r3r4)
    - [3.5 Corrección: el eje de la muñeca (`θ5` rota sobre Z, no sobre X)](#35-corrección-el-eje-de-la-muñeca-θ5-rota-sobre-z-no-sobre-x)
    - [3.6 Ángulos de Euler ZYX: de dónde salen Yaw/Pitch/Roll](#36-ángulos-de-euler-zyx-de-dónde-salen-yawpitchroll)
+   - [3.7 Por qué yaw/roll no coinciden entre métodos en la singularidad](#37-por-qué-yawroll-no-coinciden-entre-métodos-en-la-singularidad-y-por-qué-eso-no-es-un-error)
 4. [Arquitectura de módulos (hoja de ruta)](#4-arquitectura-de-módulos-hoja-de-ruta)
 5. [Módulo por módulo](#5-módulo-por-módulo)
 6. [Integración final: el BDF completo](#6-integración-final-el-bdf-completo)
@@ -362,6 +363,63 @@ mismo tiempo — no basta con que el brazo esté extendido si `θ5≠0,180°`. (
 de este documento afirmaba que bastaba `sin(φ234)=0`; esa condición era la del modelo `Rx(θ5)`
 incorrecto de la sección 3.5, no la del modelo corregido.)
 
+### 3.7 Por qué `yaw`/`roll` no coinciden entre métodos en la singularidad (y por qué eso no es un error)
+
+En el `Caso 1` (`φ234=0°`, `θ5=0°`, la condición doble de arriba), tres formas distintas de
+calcular la orientación —las fórmulas manuales de esta lección, `tr2rpy` del Robotics Toolbox
+de Peter Corke, y el hardware real (CORDIC)— dan **el mismo `pitch=-90°`** pero **`yaw`/`roll`
+distintos entre sí**. Esto no es un bug de ninguno de los tres: es la prueba en carne propia
+del *gimbal lock*.
+
+**La demostración.** Sustituyendo `pitch=-90°` en la matriz general y multiplicando
+`Rz(yaw)·Ry(-90°)·Rx(roll)` completa:
+
+```
+Rz(yaw)·Ry(-90°)·Rx(roll) = [ 0   -sin(yaw+roll)   -cos(yaw+roll) ]
+                             [ 0    cos(yaw+roll)   -sin(yaw+roll) ]
+                             [ 1         0                0        ]
+```
+
+El resultado depende **únicamente de `yaw+roll`**, nunca de los dos por separado. Existen
+infinitas parejas `(yaw,roll)` que dan exactamente la misma orientación física — cada algoritmo
+"reparte" esa suma de una manera distinta según su propio ruido numérico interno, sin que
+ninguno esté equivocado:
+
+| Método | yaw | roll | **yaw + roll** |
+|---|---|---|---|
+| Fórmulas manuales (`atan2`, esta lección) | 45° | 135° | **180°** |
+| `tr2rpy` (Robotics Toolbox) | 0° | 180° | **180°** |
+| Hardware (CORDIC, `atan2_seq3.vhd`) | -136° | -46.7° | ≈177° |
+
+Las dos versiones en punto flotante coinciden **exacto** en la suma. El hardware se desvía
+unos grados de más porque, justo en la singularidad, `atan2` divide/compara cantidades casi
+cero (`R11,R21,R32,R33 ≈ 0`) — cualquier ruido de redondeo, por pequeño que sea, se amplifica
+muchísimo ahí (el mismo fenómeno de la sección 7). El origen del "reparto" de cada método es
+distinto: las fórmulas manuales heredan el residuo de `cos(π/2)≈6·10⁻¹⁷` de la representación
+de `π` en punto flotante; `tr2rpy` tiene su propia convención interna para el caso
+`cos(pitch)=0`; el hardware tiene el redondeo de 12 iteraciones del CORDIC. Tres ruidos de
+origen distinto → tres repartos distintos de la misma suma.
+
+**La verificación correcta no es comparar `yaw`/`roll` directo — es reconstruir.** En vez de
+pedir que los tres métodos den el mismo `(yaw,roll)`, se reconstruye
+`Rz(yaw)·Ry(pitch)·Rx(roll)` con los ángulos que salieron y se compara contra la `R05`
+original:
+
+```matlab
+R_reconstruida = Rz(yaw) * Ry(pitch) * Rx(roll);
+error = norm(R_reconstruida - R05)     % debe dar ~0
+```
+
+Ese error da ~0 para cualquiera de los repartos válidos — es la prueba real de que la
+extracción está bien hecha, no que los tres números individuales coincidan (ver
+`Metodo_Geometrico_RPY.m`, bloque final, que imprime `R05` y `R_reconstruida` lado a lado más
+la diferencia elemento por elemento).
+
+> **En una frase:** en `pitch=±90°` la descomposición ZYX es matemáticamente no-única — solo
+> `yaw+roll` está determinado, no cada uno por separado. Es *gimbal lock*, la misma limitación
+> conocida de cualquier representación por ángulos de Euler (la razón por la que existen los
+> cuaterniones en navegación inercial y gráficos 3D), no un error de cálculo de este proyecto.
+
 ---
 
 ## 4. Arquitectura de módulos (hoja de ruta)
@@ -661,7 +719,21 @@ roll  = rad2deg( atan2(R32, R33) )
 
 % chequeo contra la funcion del toolbox (debe dar lo mismo)
 r_rpy_check = rad2deg(tr2rpy(R05, 'zyx'))
+
+% ===================== Verificacion del profesor: reconstruir R05 =====================
+yr = deg2rad(yaw); pr = deg2rad(pitch); rr = deg2rad(roll);
+Rz_yaw   = [cos(yr) -sin(yr) 0; sin(yr) cos(yr) 0; 0 0 1];
+Ry_pitch = [cos(pr) 0 sin(pr); 0 1 0; -sin(pr) 0 cos(pr)];
+Rx_roll  = [1 0 0; 0 cos(rr) -sin(rr); 0 sin(rr) cos(rr)];
+
+disp('Comparacion  [ R05  |  R_reconstruida ]:')
+comparacion = [R05, NaN(3,1), Rz_yaw*Ry_pitch*Rx_roll]      % lado a lado
+diferencia  = (Rz_yaw*Ry_pitch*Rx_roll) - R05                % elemento por elemento
 ```
+
+Ver [sección 3.7](#37-por-qué-yawroll-no-coinciden-entre-métodos-en-la-singularidad-y-por-qué-eso-no-es-un-error)
+para por qué esta reconstrucción es la verificación correcta (en vez de comparar `yaw`/`roll`
+directo) cuando el caso cae cerca de la singularidad.
 
 ### [`Metodo_DH_RPY_Comparacion.m`](Metodo_DH_RPY_Comparacion.m) — cadena DH rigurosa (referencia)
 
@@ -679,6 +751,19 @@ pero con `theta1..theta5` declarados con `syms` en vez de números — para ver 
 forma general (`simplify()` reduce automáticamente cada `Rᵢ` a su forma final, incluida la
 comprobación de que `R2` y `R5` se simplifican a `Rz(θ)` puro). Requiere el Symbolic Math
 Toolbox.
+
+Dos detalles prácticos de MATLAB simbólico que vale la pena conocer si se reutiliza este
+patrón en otro proyecto:
+
+- **`cos(pi/2)` no da exactamente `0` en símbolico** (porque `pi` es la aproximación de punto
+  flotante de un número irracional) — arrastra un residuo `≈6·10⁻¹⁷` por toda la cadena de
+  multiplicaciones. La solución es envolver `cos(alphaᵢ)`/`sin(alphaᵢ)` en `round()` antes de
+  meterlos en la matriz de cada articulación (`R1`, `R2`, `R3`, `R4` en el script) — para
+  `α=0°/90°` el redondeo es exacto y no pierde información, solo limpia el residuo.
+- **`simplify()` sobre un `atan2` a veces lo reescribe como `angle(...)` de un número
+  complejo** (matemáticamente equivalente, pero mucho menos legible). Si pasa, basta con no
+  envolver ese `atan2` puntual en `simplify()` — como `R21`/`R11` ya vienen de una `R05` ya
+  simplificada, no hace falta simplificar el `atan2` de nuevo.
 
 Los tres reciben los ángulos de entrada como variables sueltas al principio del script, fáciles
 de cambiar. El más antiguo, [`verificacion_fk_geometrica.m`](verificacion_fk_geometrica.m),
