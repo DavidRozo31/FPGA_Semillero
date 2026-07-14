@@ -107,7 +107,14 @@ Rx_roll  = [1 0 0; 0 cos(rr) -sin(rr); 0 sin(rr) cos(rr)];
 
 R_reconstruida = Rz_yaw * Ry_pitch * Rx_roll
 
-error_reconstruccion = norm(R_reconstruida - R05)
+% Tabla lado a lado: R05 (columnas 1-3) | separador de NaN | R_reconstruida (columnas 5-7)
+disp('Comparacion  [ R05  |  R_reconstruida ]:')
+comparacion = [R05, NaN(3,1), R_reconstruida]
+
+% Diferencia elemento por elemento (debe salir ~0 en las 9 casillas)
+diferencia = R_reconstruida - R05
+
+error_reconstruccion = norm(diferencia)
 
 
 % ===================== Posicion (atajo geometrico) =====================
