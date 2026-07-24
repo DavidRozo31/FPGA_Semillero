@@ -34,6 +34,7 @@ a hardware bloque por bloque.
    - [3.5 Corrección: el eje de la muñeca (`θ5` rota sobre Z, no sobre X)](#35-corrección-el-eje-de-la-muñeca-θ5-rota-sobre-z-no-sobre-x)
    - [3.6 Ángulos de Euler ZYX: de dónde salen Yaw/Pitch/Roll](#36-ángulos-de-euler-zyx-de-dónde-salen-yawpitchroll)
    - [3.7 Por qué yaw/roll no coinciden entre métodos en la singularidad](#37-por-qué-yawroll-no-coinciden-entre-métodos-en-la-singularidad-y-por-qué-eso-no-es-un-error)
+   - [3.8 Estandarización de la singularidad](#38-estandarización-de-la-singularidad-decisión-de-diseño-acordada-con-el-profesor)
 4. [Arquitectura de módulos (hoja de ruta)](#4-arquitectura-de-módulos-hoja-de-ruta)
 5. [Módulo por módulo](#5-módulo-por-módulo)
 6. [Integración final: el BDF completo](#6-integración-final-el-bdf-completo)
@@ -420,6 +421,48 @@ la diferencia elemento por elemento).
 > conocida de cualquier representación por ángulos de Euler (la razón por la que existen los
 > cuaterniones en navegación inercial y gráficos 3D), no un error de cálculo de este proyecto.
 
+### 3.8 Estandarización de la singularidad (decisión de diseño, acordada con el profesor)
+
+Que `yaw`/`roll` individuales no estén definidos en la singularidad es correcto
+matemáticamente, pero es un problema **práctico** en cuanto se necesita comparar resultados
+entre plataformas distintas (FPGA, MATLAB, y eventualmente un STM32): cada una reparte
+`yaw+roll` de forma diferente según su propio ruido numérico interno (residuos de `cos(π/2)`
+en MATLAB, redondeo del CORDIC en la FPGA, lo que sea que use el STM32), así que comparar
+`yaw`/`roll` directo entre plataformas **nunca** va a coincidir ahí, aunque todas estén bien
+implementadas.
+
+**La solución adoptada:** en vez de dejar que cada plataforma "reparta" la suma a su manera,
+se fija por convención — igual en todas las plataformas — cuando se detecta la singularidad:
+
+```
+Yaw = 0°      Roll = 180°      (Pitch se deja tal cual sale, siempre es confiable)
+```
+
+**Detección:** `ρ = √(R11²+R21²)` (la magnitud del vector que alimenta el cálculo de Yaw) es
+también, en la singularidad exacta, la magnitud del vector que alimenta Roll (`R33,R32`) — las
+dos se anulan juntas (ver la condición doble de la sección 3.6). Por eso basta con comparar
+`ρ` contra un umbral pequeño una sola vez para decidir si hay que fijar **ambos** ángulos.
+
+- **`mat_r05_elems.vhd`/`atan2_seq3.vhd` (FPGA):** `ρ` ya se calcula de todas formas en la
+  primera pasada del CORDIC de `atan2_seq3` (es el `mag_out` de esa pasada). Se agregó un
+  registro `singular_r` que se activa si `ρ < 50` (en Q2.13, `50/8192 ≈ 0.61 %` de la escala
+  completa) al terminar esa primera pasada — si se activa, `yaw_r` se fuerza a `0` ahí mismo, y
+  `roll_r` se fuerza a `PI_Q13` (`180°`) al terminar la tercera pasada. `pitch` nunca se toca.
+- **`Metodo_Geometrico_RPY.m` (MATLAB):** mismo criterio, `RHO_THRESH = 1e-4` (ajustable).
+
+> El umbral es una zona de compromiso inevitable: muy chico, y el ruido numérico normal cerca
+> de (pero no exactamente en) la singularidad puede "colarse" sin estandarizar; muy grande, y
+> se estandarizan casos que en realidad no eran tan cercanos a la singularidad. Los valores de
+> arriba (`50` en Q2.13, `1e-4` en MATLAB) son un punto de partida razonable — ajustar según lo
+> que se observe en simulación/hardware real si hace falta.
+
+**Consecuencia esperada:** la verificación por reconstrucción de la sección 3.6
+(`Rz(yaw)·Ry(pitch)·Rx(roll) == R05`) **ya no da error ~0 dentro de la singularidad** —eso es
+intencional, no una regresión: se está sacrificando a propósito la reconstrucción exacta de
+esa `R05` puntual (que de todas formas era solo una entre infinitas matrices válidas ahí) a
+cambio de que todas las plataformas coincidan exactamente entre sí. Fuera de la singularidad
+(el caso normal) la reconstrucción sigue dando ~0 como siempre.
+
 ---
 
 ## 4. Arquitectura de módulos (hoja de ruta)
@@ -629,16 +672,17 @@ final):
 
 ## 7. Testbench, casos de prueba y la singularidad
 
-> **Nota:** esta tabla ya refleja la corrección de la sección 3.5 (`θ5` sobre Z). Los Casos 1 y
-> 3 no cambian respecto a la versión anterior de este documento porque en ambos `θ5=0`
-> (`Rz(0)=Rx(0)=identidad`, así que el error no tenía forma de manifestarse ahí). El Caso 2 es
-> el único con `θ5≠0` **y** `φ234≠0` al mismo tiempo, y sí cambia — ver más abajo.
+> **Nota:** esta tabla ya refleja la corrección de la sección 3.5 (`θ5` sobre Z) y la
+> estandarización de la singularidad de la sección 3.8. Los Casos 1 y 3 no cambian respecto a
+> la corrección de `θ5` porque en ambos `θ5=0` (`Rz(0)=Rx(0)=identidad`). El Caso 2 es el único
+> con `θ5≠0` **y** `φ234≠0` al mismo tiempo, y sí cambió con esa corrección. El Caso 1 además
+> cambió aparte con la estandarización de la sección 3.8 (`yaw`/`roll` fijos en vez de ruido).
 
 Los 3 casos de prueba finales (`theta1..theta5` en grados; salidas en raw Q2.13):
 
 | Caso | θ1,θ2,θ3,θ4,θ5 | x | y | z | yaw | pitch | roll |
 |---|---|---|---|---|---|---|---|
-| 1 — singularidad (`φ234=0` y `θ5=0`) | `0,0,0,0,0` | 3422 | 3 | 412 | 26363* | -12865 | 627* |
+| 1 — singularidad (`φ234=0` y `θ5=0`), **estandarizada** | `0,0,0,0,0` | 3422 | 3 | 412 | **0** (fijo) | -12865 | **25736** (fijo, =180°) |
 | 2 — limpio | `45,0,0,90,45` | 1375 | 1374 | 1887 | -12868‡ | ~0 | ~0 |
 | 3 — limpio | `0,45,0,0,0` | 2418 | 2 | 2826 | -25733† | -6433 | 3 |
 
@@ -652,22 +696,17 @@ cruzada de la sección 3.5) — el resultado esperado ahora es `yaw≈-90°, pit
 Pendiente confirmar con una nueva corrida de simulación tras aplicar el fix a
 `mat_r05_elems.vhd`.
 
-**(\*) Caso 1 — inestabilidad numérica real en la singularidad.** Con `φ234=0` y `θ5=0`
-(la condición doble de la sección 3.6), `R11`, `R21`, `R32` y `R33` no llegan como ceros
-matemáticos exactos sino como **residuos de redondeo del CORDIC** (`cos1`, `sin234`, etc.
-tienen su propio error de ±0.02°). El resultado es que `yaw`/`roll` calculan `atan2` de un
-vector prácticamente nulo, cuyo ángulo resultante es extremadamente sensible a ese ruido de
-redondeo — puede salir literalmente cualquier valor. Esto pasa incluso en MATLAB de doble
-precisión (por el truncamiento de `π/2`, ver más abajo), no es exclusivo del hardware.
-
-En esta singularidad, `yaw` y `roll` individuales **no son verificables** entre distintos
-métodos — solo `yaw+roll` lo es (sección 3.6 explica por qué). La forma correcta de validar
-un caso así (sugerida por el profesor del semillero) no es comparar `yaw`/`roll` directo, sino
-**reconstruir** `Rz(yaw)·Ry(pitch)·Rx(roll)` con los ángulos obtenidos y verificar que
-reproduce la misma `R05` — ver `Metodo_Geometrico_RPY.m`, bloque final. Si el error de
-reconstrucción da ~0, la extracción es correcta aunque el reparto `yaw`/`roll` no coincida con
-otro algoritmo (p. ej. `tr2rpy`). Es la confirmación en hardware real del *gimbal lock*
-descrito en la sección 3.6, no un bug.
+**(\*) Caso 1 — la singularidad, ahora estandarizada.** Con `φ234=0` y `θ5=0` (la condición
+doble de la sección 3.6), `R11`, `R21`, `R32` y `R33` no llegan como ceros matemáticos exactos
+sino como **residuos de redondeo del CORDIC** (`cos1`, `sin234`, etc. tienen su propio error de
+±0.02°) — así que calcular `atan2` de un vector prácticamente nulo daba, en la versión
+anterior de este proyecto, un ángulo extremadamente sensible a ese ruido (podía salir
+literalmente cualquier valor, distinto en MATLAB, en el hardware, o en cualquier otra
+plataforma — ver sección 3.7 para la demostración completa de por qué). **Esto ya no pasa**:
+la sección 3.8 documenta la estandarización acordada con el profesor (`yaw=0°, roll=180°` fijos
+cuando se detecta la singularidad), implementada tanto en `atan2_seq3.vhd` como en
+`Metodo_Geometrico_RPY.m` — por eso la tabla de arriba ya muestra los valores fijos, no ruido.
+`pitch` nunca necesitó esto, siempre fue confiable ahí.
 
 **(†) Caso 3 — el corte de ±180°.** `+180°` y `-180°` son el mismo ángulo físico (es el punto
 de discontinuidad de `atan2`). Como aquí `R11` es muy negativo y `R21` casi cero (con signo
