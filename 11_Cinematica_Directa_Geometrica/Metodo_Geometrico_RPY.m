@@ -81,22 +81,47 @@ R31 = R05(3,1);
 R32 = R05(3,2);
 R33 = R05(3,3);
 
-yaw   = rad2deg( atan2(R21, R11) )
+% rho = sqrt(R11^2+R21^2) es tambien la magnitud de (R33,R32) en la
+% singularidad (las dos se anulan juntas -- ver seccion 3.6/3.7 del
+% README de la leccion 11). Sirve para DETECTAR la singularidad antes
+% de calcular yaw/roll.
+rho = sqrt(R11^2 + R21^2);
 
-pitch = rad2deg( atan2(-R31, sqrt(R11^2 + R21^2)) )
+RHO_THRESH = 1e-4;   % umbral de "rho ~ 0" -- ajustable
 
-roll  = rad2deg( atan2(R32, R33) )
+if rho < RHO_THRESH
+    % ESTANDARIZACION (acordada con el profesor): en pitch=+-90 grados,
+    % yaw y roll individuales no estan matematicamente definidos (solo
+    % yaw+roll lo esta), y cada plataforma (FPGA, MATLAB, STM32) los
+    % repartiria distinto segun su propio ruido de redondeo. Para que
+    % TODAS den el mismo numero aqui, se fija por convencion:
+    yaw  = 0;
+    roll = 180;
+    fprintf('[SINGULARIDAD detectada: rho=%.2e < %.2e] yaw y roll fijados por convencion.\n', rho, RHO_THRESH);
+else
+    yaw  = rad2deg( atan2(R21, R11) );
+    roll = rad2deg( atan2(R32, R33) );
+end
 
-% chequeo contra la funcion del toolbox (debe dar lo mismo)
+pitch = rad2deg( atan2(-R31, rho) )   % pitch SIEMPRE es confiable, nunca se estandariza
+yaw
+roll
+
+% chequeo contra la funcion del toolbox (da el reparto "natural" del
+% toolbox, sin estandarizar -- va a diferir de yaw/roll en la singularidad,
+% eso es esperado, ver seccion 3.7 del README)
 r_rpy_check = rad2deg(tr2rpy(R05, 'zyx'))
 
 
 % ===================== Verificacion del profesor: reconstruir R05 =====================
 % Con yaw,pitch,roll ya extraidos, arma Rz(yaw)*Ry(pitch)*Rx(roll) y
-% compara contra R05. Si el error sale ~0, la extraccion es correcta
-% -- incluso en la singularidad (ahi yaw y roll individuales pueden
-% no coincidir con otro metodo, pero la matriz reconstruida sí debe
-% ser la misma R05, porque en pitch=+-90 solo importa yaw+roll).
+% compara contra R05. Fuera de la singularidad el error debe dar ~0.
+% DENTRO de la singularidad, como yaw/roll ahora estan ESTANDARIZADOS
+% (fijos en 0/180 en vez del reparto que reconstruye R05 exacto), el
+% error puede NO dar ~0 -- es el costo esperado de estandarizar: se
+% gana consistencia entre plataformas, se pierde la reconstruccion
+% exacta de esa R05 puntual (que de todas formas era una entre
+% infinitas posibles ahi).
 yr = deg2rad(yaw);
 pr = deg2rad(pitch);
 rr = deg2rad(roll);

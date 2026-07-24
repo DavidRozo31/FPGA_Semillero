@@ -11,6 +11,21 @@
 --  por eso no se puede paralelizar como cordic_seq5, tiene que
 --  ser estrictamente secuencial.
 --
+--  ESTANDARIZACION DE LA SINGULARIDAD (gimbal lock, acordado con el
+--  profesor): cuando pitch=+-90 grados, Yaw y Roll individuales no
+--  estan matematicamente definidos (solo Yaw+Roll lo esta), y cada
+--  implementacion (FPGA, MATLAB, STM32) reparte esa suma distinto
+--  segun su propio ruido de redondeo. Para que TODAS las plataformas
+--  den exactamente el mismo numero ahi, se fija por convencion:
+--
+--      Yaw = 0, Roll = 180 grados   (cuando rho ~ 0, ver mas abajo)
+--
+--  Deteccion: en la pasada 1, "rho" (mag de R11,R21) es tambien la
+--  magnitud de (R33,R32) en la singularidad (las dos se anulan juntas
+--  — ver derivacion en la leccion 11 del repo, seccion 3.6/3.7). Por
+--  eso basta con comparar rho contra un umbral chico al terminar la
+--  pasada 1 para saber si hay que forzar Yaw Y Roll.
+--
 --  No modifica cordic_atan2_16.vhd (se instancia tal cual).
 --  Latencia total ~ 3*(N_ITER+1) + overhead FSM = ~40-42 ciclos.
 --  Universidad Militar Nueva Granada
@@ -18,6 +33,7 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
+use work.ik_pkg.ALL;
 
 entity atan2_seq3 is
     Port (
@@ -40,6 +56,11 @@ entity atan2_seq3 is
 end atan2_seq3;
 
 architecture rtl of atan2_seq3 is
+
+    -- Umbral de "rho ~ 0" para detectar la singularidad (Q2.13).
+    -- 50 raw = 50/8192 = 0.61% de la escala completa. Ajustable si en
+    -- simulacion real se ve que hace falta mas o menos margen.
+    constant RHO_THRESH : signed(15 downto 0) := to_signed(50, 16);
 
     -- CORDIC vectoring unico, reutilizado (no se modifica, se instancia tal cual)
     component cordic_atan2_16 is
@@ -65,6 +86,7 @@ architecture rtl of atan2_seq3 is
     signal c_mag        : std_logic_vector(15 downto 0);
 
     signal yaw_r, pitch_r, roll_r : std_logic_vector(15 downto 0) := (others => '0');
+    signal singular_r              : std_logic := '0';
     signal done_reg                : std_logic := '0';
 
     -- Deteccion de flanco de subida en start (mismo truco que cordic_seq4/5)
@@ -99,6 +121,7 @@ begin
             yaw_r        <= (others => '0');
             pitch_r      <= (others => '0');
             roll_r       <= (others => '0');
+            singular_r   <= '0';
 
         elsif rising_edge(clk) then
 
@@ -118,7 +141,15 @@ begin
 
                 when S_W1 =>
                     if cordic_done = '1' then
-                        yaw_r        <= c_angle;
+                        -- Singularidad: rho (=c_mag) casi cero -> Yaw indefinido,
+                        -- se fija por convencion en 0 en vez del valor ruidoso del CORDIC.
+                        if signed(c_mag) < RHO_THRESH then
+                            yaw_r      <= (others => '0');
+                            singular_r <= '1';
+                        else
+                            yaw_r      <= c_angle;
+                            singular_r <= '0';
+                        end if;
                         x_mux        <= c_mag;                              -- rho de la pasada 1
                         y_mux        <= std_logic_vector(-signed(r31_in));  -- -R31
                         cordic_start <= '1';
@@ -127,7 +158,7 @@ begin
 
                 when S_W2 =>
                     if cordic_done = '1' then
-                        pitch_r      <= c_angle;
+                        pitch_r      <= c_angle;  -- pitch SI es confiable en la singularidad, no se toca
                         x_mux        <= r33_in;
                         y_mux        <= r32_in;
                         cordic_start <= '1';
@@ -136,7 +167,14 @@ begin
 
                 when S_W3 =>
                     if cordic_done = '1' then
-                        roll_r   <= c_angle;
+                        -- Misma singularidad detectada en la pasada 1 (rho~0) implica
+                        -- que (R33,R32) tambien es ~(0,0) aqui -> Roll indefinido,
+                        -- se fija por convencion en 180 grados (PI_Q13).
+                        if singular_r = '1' then
+                            roll_r <= PI_Q13;
+                        else
+                            roll_r <= c_angle;
+                        end if;
                         done_reg <= '1';
                         state    <= S_IDLE;
                     end if;
