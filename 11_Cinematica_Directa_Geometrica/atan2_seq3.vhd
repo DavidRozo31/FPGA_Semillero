@@ -171,7 +171,7 @@ begin
                         -- que (R33,R32) tambien es ~(0,0) aqui -> Roll indefinido,
                         -- se fija por convencion en 180 grados (PI_Q13).
                         if singular_r = '1' then
-                            roll_r <= PI_Q13;
+                            roll_r <= std_logic_vector(PI_Q13);
                         else
                             roll_r <= c_angle;
                         end if;
