@@ -20,10 +20,11 @@ línea por línea.
 | 9 | [Control_Servos_UART](9_Control_Servos_UART/README.md) | De 1 a 6 servomotores controlados por UART (hardware + GUIs en Python) | FPGA — aplicación |
 | 10 | [Diseno_CAD_SolidWorks](10_Diseno_CAD_SolidWorks/README.md) | Referencia del diseño mecánico del brazo físico | CAD — referencia |
 | 11 | [Cinematica_Directa_Geometrica](11_Cinematica_Directa_Geometrica/README.md) | Cinemática directa 5R (posición + orientación) por método geométrico — mismo resultado que la lección 7, una fracción de los recursos lógicos | FPGA — cinemática |
+| 12 | [Cinematica_Directa_6GDL](12_Cinematica_Directa_6GDL/README.md) | De 5R+gripper a 6 GDL real: tabla DH corregida, la posición deja de ser independiente de la muñeca, y una crisis de recursos real (Fitter Failed) con su causa raíz medida y su arreglo | FPGA — cinemática |
 
 ### Orden de lectura recomendado
 
-`1 → 2 → 3 → 4 → 5 (opcional/histórico) → 6 → 7 → 8 → 9 → 10 → 11`
+`1 → 2 → 3 → 4 → 5 (opcional/histórico) → 6 → 7 → 8 → 9 → 10 → 11 → 12`
 
 Las lecciones 1-4 sientan las bases del lenguaje y las herramientas. La lección 5 documenta
 un intento anterior de cinemática **inversa** (ya no es la arquitectura activa del robot 2R,
