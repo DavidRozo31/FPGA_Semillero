@@ -306,62 +306,15 @@ sección 6 con su causa raíz medida, no solo su síntoma.
 
 ## 10. Comparación con STM32: hardware dedicado vs. software, y el efecto del reloj
 
-Mismo ejercicio que ya se hizo para el brazo de 5R: portar la misma cinemática (mismas fórmulas
-de la sección 3 y 4, esta vez con `double` y `<math.h>` en vez de Q2.13/CORDIC, porque el
-STM32F767ZI sí tiene FPU) a un STM32 y medir cuántos ciclos de CPU tarda, para comparar contra
-los ~152-160 ciclos que tarda la FPGA (versión con multiplicador reutilizado, sección 6).
-
-Dos proyectos Keil, **código de cinemática idéntico**, la única diferencia es el reloj:
-
-- [`FK_6R_Geometrico_STM32.cpp`](FK_6R_Geometrico_STM32.cpp) — 216 MHz (PLL + Over-drive, máxima
-  velocidad real del chip).
-- [`FK_6R_Geometrico_STM32_HSI16MHz.cpp`](FK_6R_Geometrico_STM32_HSI16MHz.cpp) — 16 MHz (HSI
-  directo, sin PLL, la velocidad "de fábrica" tras un reset).
-
-Los mismos 3 casos de la sección 7 (extendido, singularidad nueva del 6R, genérico), medidos con
-`DWT->CYCCNT` (log completo en
-[`output_2026-08-18_STM32_6GDL_216MHz_vs_16MHz.log`](output_2026-08-18_STM32_6GDL_216MHz_vs_16MHz.log)):
-
-| Caso | Ciclos (promedio, 216MHz) | Tiempo @ 216MHz | Ciclos (promedio, 16MHz) | Tiempo @ 16MHz |
-|---|---|---|---|---|
-| A — extendido | 7,452 | 34.500 µs | 7,451 | 465.688 µs |
-| B — singularidad | 7,240 | 33.519 µs | 7,239 | 452.438 µs |
-| C — genérico | 10,545 | 48.819 µs | 10,546 | 659.125 µs |
-
-Los valores de posición/orientación coincidieron **exactos** con lo esperado en los 3 casos, en
-las dos velocidades — confirma que el puerto a C/STM32 está bien hecho, independiente del reloj.
-
-### Tres observaciones, cada una con su explicación (no solo el dato)
-
-**1. Los ciclos no cambian con el reloj — el tiempo sí.** El promedio de ciclos es prácticamente
-idéntico entre 216MHz y 16MHz (7,452 vs 7,451; 7,240 vs 7,239; 10,545 vs 10,546) — tiene sentido:
-`DWT->CYCCNT` cuenta ciclos de CPU, y el mismo código ejecuta el mismo número de instrucciones
-sin importar qué tan rápido tiquetee el reloj. Lo que cambia es cuánto dura cada ciclo — por eso
-el tiempo real sí escala ~13.5× entre las dos tarjetas, justo la relación 216/16.
-
-**2. La primera ejecución a 216MHz paga un costo extra que no aparece en ningún otro caso.**
-Caso A "en frío" da 8,428 ciclos a 216MHz contra un promedio de 7,452 — una brecha de 976 ciclos
-que no se repite ni en los Casos B/C ni en ninguna medición a 16MHz (ahí la brecha "en frío" es
-de solo 398 ciclos). La explicación: el Caso A es la *primera* vez que se ejecuta
-`forward_kinematics()` desde el arranque, con el I-cache totalmente frío — cada instrucción se
-trae de Flash, que a 216MHz necesita 7 ciclos de espera por acceso (`FLASH->ACR`) contra
-prácticamente 0 a 16MHz. Para cuando corren los Casos B y C, el código ya quedó cacheado por las
-1000 repeticiones del Caso A — por eso ahí la brecha desaparece.
-
-**3. El caso de la singularidad es el más rápido de los tres, y se explica directamente en el
-código.** El Caso B evita 2 llamadas a `atan2()` (`yaw` y `roll` se fijan a constantes en la
-rama de singularidad, sección 4) — con eso se ahorran los ~200 ciclos de diferencia frente al
-Caso A, que sí calcula las 3 (`yaw`, `pitch`, `roll`) con `atan2()`.
-
-### FPGA vs. STM32, el resultado que se buscaba
+El puerto completo a STM32 (dos proyectos Keil, mismo código de cinemática, 216MHz vs 16MHz sin
+PLL, explicado paso a paso con el log real del UART) quedó documentado aparte en la
+**[lección 13](../13_Cinematica_Directa_6GDL_STM32/README.md)**. Resumen del resultado:
 
 | | FPGA (50 MHz) | STM32 @ 216 MHz | STM32 @ 16 MHz |
 |---|---|---|---|
 | Tiempo (constante / según caso) | ~3.1 µs | 33.5–48.8 µs | 452–659 µs |
-| **Cuántas veces más lento que la FPGA** | 1× | **10.8×–15.7×** | **146×–212×** |
+| **Veces más lento que la FPGA** | 1× | **10.8×–15.7×** | **146×–212×** |
 
 A pesar de que el STM32 a máxima velocidad tiene un reloj **4.3 veces más rápido** que la FPGA,
-termina el mismo cálculo entre **10.8 y 15.7 veces más lento** — mismo patrón que ya se había
-visto con el brazo de 5R: hardware dedicado en pipeline le gana por mucho a software secuencial,
-sin importar cuánto reloj se le meta al software. Y bajar la tarjeta a su velocidad de fábrica
-(16MHz) multiplica esa brecha por otras ~13.5×, hasta más de 200× frente a la FPGA.
+termina el mismo cálculo entre **10.8 y 15.7 veces más lento** — hardware dedicado en pipeline
+le gana por mucho a software secuencial, sin importar cuánto reloj se le meta al software.
