@@ -20,28 +20,17 @@
 %
 % ===================================================================
 %  CASOS YA PROBADOS EN MODELSIM (VHDL, Paso 7 -- integracion final)
-%  Para verificar cualquiera de estos aqui: cambia las lineas theta1
-%  (linea ~37), theta2 (~46), theta3 (~55), theta4 (~64), theta5 (~73)
-%  y theta6 (~82) por los valores de grados de abajo, envueltos en
-%  deg2rad(...), por ejemplo:  theta1 = deg2rad(30);
-%  Compara pos/yaw/pitch/roll contra los "esperado" de cada caso.
+% ===================================================================
 %
-%  CasoA [q=0, extendido] -- todos en deg2rad(0):
-%    esperado: pos=[0.4200 0 0.0650] m | yaw=-90 pitch=0 roll=-90
-%    (rho=1 exacto, NO es singularidad)
+%  Caso A: theta1=0  theta2=0  theta3=0  theta4=0  theta5=0  theta6=0
+%    esperado: pos=[0.4200 0 0.0650] | yaw=-90 pitch=0 roll=-90
 %
-%  CasoB [SINGULARIDAD del 6R, estandarizada] -- solo theta5 y theta6
-%  cambian, el resto en deg2rad(0):
-%    theta5 = deg2rad(90);  theta6 = deg2rad(90);
-%    esperado: pos=[0.2470 0.1730 0.0650] m
-%    rho~0 -> yaw=0 (fijo) roll=180 (fijo) | pitch=90 (siempre confiable)
-%    (esta es la singularidad NUEVA del brazo de 6 GDL -- ya NO ocurre
-%    en q=0 como en el brazo viejo de 5R, ocurre aqui)
+%  Caso B: theta1=0  theta2=0  theta3=0  theta4=0  theta5=deg2rad(90)  theta6=deg2rad(90)
+%    esperado: pos=[0.2470 0.1730 0.0650] | SINGULARIDAD -> yaw=0 roll=180 pitch=90
 %
-%  CasoC [generico, sin singularidad]:
-%    theta1 = deg2rad(30);  theta2 = deg2rad(20);  theta3 = deg2rad(-15);
-%    theta4 = deg2rad(45);  theta5 = deg2rad(60);  theta6 = deg2rad(-70);
-%    esperado: pos~=[0.2215 0.2502 0.2269] m | yaw~-42.50 pitch~-34.56 roll~-37.47
+%  Caso C: theta1=deg2rad(30)  theta2=deg2rad(20)  theta3=deg2rad(-15)
+%          theta4=deg2rad(45)  theta5=deg2rad(60)  theta6=deg2rad(-70)
+%    esperado: pos~=[0.2215 0.2502 0.2269] | yaw~-42.50 pitch~-34.56 roll~-37.47
 % ===================================================================
 
 % Longitudes (cm)
@@ -181,27 +170,45 @@ diferencia = R_reconstruida - R06
 error_reconstruccion = norm(diferencia)
 
 
-% ===================== Posicion (atajo geometrico) =====================
-% OJO -- esto es DISTINTO al brazo de 5R: aqui la posicion YA NO es
-% independiente de la muneca. theta4 y theta5 SI mueven x,y,z porque la
-% muneca tiene longitud fisica propia (Ld4, Ld6), no un solo punto.
+% ===================== Posicion (metodo geometrico RECURSIVO, del profesor) =====================
+% Igual idea que el ejemplo del profesor (Inversa2R.pdf): la posicion se
+% acumula eslabon por eslabon, NO con un atajo trigonometrico global.
 %
-% Paso A: posicion del sistema 4 (misma formula de siempre, con Ld4 en
-% vez de L45, SIN termino phi234 porque theta4 ya no es coplanar con
-% theta2,theta3 en esta tabla):
-phi2  = theta2;
-phi23 = theta2 + theta3;
+% Para cada eslabon i:
+%   p_i = [ a_i*cos(theta_i') , a_i*sin(theta_i') , d_i ]   <- desplazamiento
+%         LOCAL de ese eslabon (sale directo de su fila en la tabla DH,
+%         theta_i' ya incluye el desfase fijo de esa fila si tiene)
+%   O_i = O_(i-1) + R_(i-1)^0 * p_i   <- se rota ese desplazamiento local
+%         al "idioma" de la base (con la rotacion acumulada HASTA el
+%         eslabon anterior, que ya se calculo arriba: R1, R02, R03, R04, R05)
+%         y se suma a donde ya estaba el eslabon anterior
+%
+% O0 = [0;0;0], R_0^0 = identidad (la base no esta rotada respecto a si misma)
 
-r4 = L2*cos(phi2) + Ld4*cos(phi23);
-z4 = L1 + L2*sin(phi2) + Ld4*sin(phi23);
-x4 = r4*cos(theta1);
-y4 = r4*sin(theta1);
+O0 = [0;0;0];
 
-% Paso B: se le suma el offset de la muneca (Ld6) en la direccion de Z6
-% en el mundo -- que es exactamente la columna 3 de R0_6 (R13,R23,R33),
-% ya calculada arriba. Por eso la posicion depende de R0_6 completa.
-x = x4 + Ld6*R13;
-y = y4 + Ld6*R23;
-z = z4 + Ld6*R33;
+% --- eslabon 1: a1=0, d1=L1, theta1' = theta1 ---
+p1 = [0; 0; L1];
+O1 = O0 + eye(3)*p1
 
-pos = [x y z]
+% --- eslabon 2: a2=L2, d2=0, theta2' = theta2 ---
+p2 = [L2*cos(theta2); L2*sin(theta2); 0];
+O2 = O1 + R1*p2
+
+% --- eslabon 3: a3=0, d3=0 (sistema 3 = sistema 2, "regla 4") ---
+p3 = [0; 0; 0];
+O3 = O2 + R02*p3
+
+% --- eslabon 4: a4=0, d4=Ld4, theta4' = theta4+pi/2 ---
+p4 = [0; 0; Ld4];
+O4 = O3 + R03*p4
+
+% --- eslabon 5: a5=0, d5=0 (sistema 5 = sistema 4, "regla 4") ---
+p5 = [0; 0; 0];
+O5 = O4 + R04*p5
+
+% --- eslabon 6: a6=0, d6=Ld6, theta6' = theta6 ---
+p6 = [0; 0; Ld6];
+O6 = O5 + R05*p6
+
+pos = O6'

@@ -1,21 +1,21 @@
 -- =============================================================
 --  cordic_seq6.vhd
 --  Paso 2 — Cinematica Directa por METODO GEOMETRICO (brazo de 6 GDL)
---  Extiende cordic_seq5: reutiliza el MISMO cordic_sincos_16 en
---  6 pasadas secuenciales en vez de 5.
 --
---  ACTUALIZADO respecto al brazo de 5R+gripper: la tabla DH nueva
---  ya no tiene phi234 (theta4 deja de ser coplanar con theta2,theta3
---  -- ver leccion 12), asi que se cambia esa pasada por theta4 solo,
---  y se agrega una pasada nueva para theta6 (la sexta articulacion
---  real). phi2_in es literalmente theta2 (angle_sum_gen ya no lo
---  calcula, se cablea directo en el BDF).
+--  ================== REVISION 2 (correccion del profesor) ==================
+--  El metodo geometrico recursivo (Inversa2R.pdf) usa el theta_i PROPIO de
+--  cada fila de la tabla DH, no angulos acumulados (phi2, phi23) -- por eso
+--  esta version ya NO necesita angle_sum_gen.vhd: corre CORDIC sobre
+--  theta1..theta6 CRUDOS, una pasada por articulacion, sin sumar nada.
 --
---  Pasadas: theta1, phi2(=theta2), phi23, theta4, theta5, theta6.
+--  El desfase +pi/2 de las filas 3 y 4 (theta3+pi/2, theta4+pi/2) tampoco
+--  hace falta pasarlo por el CORDIC: cos(x+pi/2)=-sin(x) y sin(x+pi/2)=cos(x)
+--  son identidades trigonometricas exactas -- el modulo siguiente
+--  (fk_recursivo_core) arma esas dos con un simple cambio de signo de
+--  cos3/sin3 y cos4/sin4, sin gastar CORDIC ni multiplicador extra en eso.
+--  ==========================================================================
 --
---  cos1/sin1 y cos234... -- ojo, ya NO hay cos234/sin234 (ver arriba).
---  Los cos/sin de theta4,theta5,theta6 hacen falta para armar R0_6
---  (ver mat_r06_elems, Paso 5).
+--  Pasadas: theta1, theta2, theta3, theta4, theta5, theta6 (crudos).
 --
 --  No modifica cordic_sincos_16.vhd (se instancia tal cual).
 --  Latencia total ~ 6*(N_ITER+1) + overhead FSM = ~78-84 ciclos.
@@ -32,8 +32,8 @@ entity cordic_seq6 is
         start      : in  std_logic;
 
         theta1_in  : in  std_logic_vector(15 downto 0);
-        phi2_in    : in  std_logic_vector(15 downto 0);  -- = theta2, sin calculo previo
-        phi23_in   : in  std_logic_vector(15 downto 0);
+        theta2_in  : in  std_logic_vector(15 downto 0);
+        theta3_in  : in  std_logic_vector(15 downto 0);
         theta4_in  : in  std_logic_vector(15 downto 0);
         theta5_in  : in  std_logic_vector(15 downto 0);
         theta6_in  : in  std_logic_vector(15 downto 0);
@@ -42,8 +42,8 @@ entity cordic_seq6 is
         sin1_out   : out std_logic_vector(15 downto 0);
         cos2_out   : out std_logic_vector(15 downto 0);
         sin2_out   : out std_logic_vector(15 downto 0);
-        cos23_out  : out std_logic_vector(15 downto 0);
-        sin23_out  : out std_logic_vector(15 downto 0);
+        cos3_out   : out std_logic_vector(15 downto 0);
+        sin3_out   : out std_logic_vector(15 downto 0);
         cos4_out   : out std_logic_vector(15 downto 0);
         sin4_out   : out std_logic_vector(15 downto 0);
         cos5_out   : out std_logic_vector(15 downto 0);
@@ -79,15 +79,15 @@ architecture rtl of cordic_seq6 is
     signal cordic_cos   : std_logic_vector(15 downto 0);
     signal cordic_sin   : std_logic_vector(15 downto 0);
 
-    signal cos1_r, sin1_r   : std_logic_vector(15 downto 0) := (others => '0');
-    signal cos2_r, sin2_r   : std_logic_vector(15 downto 0) := (others => '0');
-    signal cos23_r, sin23_r : std_logic_vector(15 downto 0) := (others => '0');
-    signal cos4_r, sin4_r   : std_logic_vector(15 downto 0) := (others => '0');
-    signal cos5_r, sin5_r   : std_logic_vector(15 downto 0) := (others => '0');
-    signal cos6_r, sin6_r   : std_logic_vector(15 downto 0) := (others => '0');
-    signal done_reg         : std_logic := '0';
+    signal cos1_r, sin1_r : std_logic_vector(15 downto 0) := (others => '0');
+    signal cos2_r, sin2_r : std_logic_vector(15 downto 0) := (others => '0');
+    signal cos3_r, sin3_r : std_logic_vector(15 downto 0) := (others => '0');
+    signal cos4_r, sin4_r : std_logic_vector(15 downto 0) := (others => '0');
+    signal cos5_r, sin5_r : std_logic_vector(15 downto 0) := (others => '0');
+    signal cos6_r, sin6_r : std_logic_vector(15 downto 0) := (others => '0');
+    signal done_reg       : std_logic := '0';
 
-    -- Deteccion de flanco de subida en start (mismo truco que cordic_seq4/5)
+    -- Deteccion de flanco de subida en start (mismo truco de siempre)
     signal start_prev : std_logic := '0';
     signal start_edge : std_logic;
 
@@ -113,18 +113,12 @@ begin
             cordic_start <= '0';
             done_reg     <= '0';
             start_prev   <= '0';
-            cos1_r       <= (others => '0');
-            sin1_r       <= (others => '0');
-            cos2_r       <= (others => '0');
-            sin2_r       <= (others => '0');
-            cos23_r      <= (others => '0');
-            sin23_r      <= (others => '0');
-            cos4_r       <= (others => '0');
-            sin4_r       <= (others => '0');
-            cos5_r       <= (others => '0');
-            sin5_r       <= (others => '0');
-            cos6_r       <= (others => '0');
-            sin6_r       <= (others => '0');
+            cos1_r <= (others => '0'); sin1_r <= (others => '0');
+            cos2_r <= (others => '0'); sin2_r <= (others => '0');
+            cos3_r <= (others => '0'); sin3_r <= (others => '0');
+            cos4_r <= (others => '0'); sin4_r <= (others => '0');
+            cos5_r <= (others => '0'); sin5_r <= (others => '0');
+            cos6_r <= (others => '0'); sin6_r <= (others => '0');
 
         elsif rising_edge(clk) then
 
@@ -145,7 +139,7 @@ begin
                     if cordic_done = '1' then
                         cos1_r       <= cordic_cos;
                         sin1_r       <= cordic_sin;
-                        angle_mux    <= phi2_in;
+                        angle_mux    <= theta2_in;
                         cordic_start <= '1';
                         state        <= S_W2;
                     end if;
@@ -154,15 +148,15 @@ begin
                     if cordic_done = '1' then
                         cos2_r       <= cordic_cos;
                         sin2_r       <= cordic_sin;
-                        angle_mux    <= phi23_in;
+                        angle_mux    <= theta3_in;
                         cordic_start <= '1';
                         state        <= S_W3;
                     end if;
 
                 when S_W3 =>
                     if cordic_done = '1' then
-                        cos23_r      <= cordic_cos;
-                        sin23_r      <= cordic_sin;
+                        cos3_r       <= cordic_cos;
+                        sin3_r       <= cordic_sin;
                         angle_mux    <= theta4_in;
                         cordic_start <= '1';
                         state        <= S_W4;
@@ -198,18 +192,12 @@ begin
         end if;
     end process;
 
-    cos1_out   <= cos1_r;
-    sin1_out   <= sin1_r;
-    cos2_out   <= cos2_r;
-    sin2_out   <= sin2_r;
-    cos23_out  <= cos23_r;
-    sin23_out  <= sin23_r;
-    cos4_out   <= cos4_r;
-    sin4_out   <= sin4_r;
-    cos5_out   <= cos5_r;
-    sin5_out   <= sin5_r;
-    cos6_out   <= cos6_r;
-    sin6_out   <= sin6_r;
-    done       <= done_reg;
+    cos1_out <= cos1_r; sin1_out <= sin1_r;
+    cos2_out <= cos2_r; sin2_out <= sin2_r;
+    cos3_out <= cos3_r; sin3_out <= sin3_r;
+    cos4_out <= cos4_r; sin4_out <= sin4_r;
+    cos5_out <= cos5_r; sin5_out <= sin5_r;
+    cos6_out <= cos6_r; sin6_out <= sin6_r;
+    done     <= done_reg;
 
 end rtl;
