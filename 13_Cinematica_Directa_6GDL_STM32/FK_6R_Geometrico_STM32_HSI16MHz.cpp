@@ -8,10 +8,20 @@
 // con Over-drive). Comparar los ciclos/tiempo de los dos da el efecto puro
 // de subir el reloj, sin cambiar ni una linea de la logica de calculo.
 //
+// ================== REVISION 2 (correccion del profesor) ==================
+// Mismos dos cambios que FK_6R_Geometrico_STM32.cpp -- ver ese archivo para
+// la explicacion completa:
+// 1) Posicion: metodo recursivo eslabon-por-eslabon (Inversa2R.pdf del
+//    profesor) en vez del atajo trigonometrico anterior.
+// 2) Medicion de tiempo: TIM5 en vez de DWT->CYCCNT.
+// ============================================================================
+//
 // Reloj:  HSI directo, 16 MHz, sin PLL. AHB=APB1=APB2=16MHz (sin prescalers,
 //         es el estado por defecto al resetear el chip -- se deja explicito
 //         aqui solo para que quede documentado, no porque haga falta).
-// Medicion: contador de ciclos DWT->CYCCNT (1 ciclo de resolucion).
+// Medicion: TIM5->CNT, con TIM5 corriendo a 16MHz (APB1=16MHz CON prescaler
+//          de bus =/1 -> el reloj de TIM NO se dobla, a diferencia de la
+//          version de 216MHz -- regla estandar del arbol de reloj del F7).
 // Salida:  USART3 (PD8=TX, PD9=RX, AF7) -> puerto virtual COM del ST-LINK.
 //         9600 baudios, BRR recalculado para APB1=16MHz (antes era 54MHz).
 // ============================================================================
@@ -62,20 +72,21 @@ void mat3_mul(const Mat3 A, const Mat3 B, Mat3 out) {
             out[i][j] = tmp[i][j];
 }
 
+// out = R * v (matriz 3x3 por vector 3x1)
+void mat3_vec(const Mat3 R, const double v[3], double out[3]) {
+    for (int i = 0; i < 3; i++) {
+        double s = 0;
+        for (int k = 0; k < 3; k++) s += R[i][k]*v[k];
+        out[i] = s;
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Cinematica directa geometrica, brazo de 6 GDL real (IDENTICA a la version
 // de 216MHz -- ver ese archivo para la explicacion completa de cada parte).
 // ---------------------------------------------------------------------------
 FK_Result forward_kinematics(double theta1, double theta2, double theta3,
                               double theta4, double theta5, double theta6) {
-    double phi2  = theta2;
-    double phi23 = theta2 + theta3;
-
-    double r4 = L2*cos(phi2) + LD4*cos(phi23);
-    double z4 = L1 + L2*sin(phi2) + LD4*sin(phi23);
-    double x4 = r4*cos(theta1);
-    double y4 = r4*sin(theta1);
-
     Mat3 R1, R2, R3, R4, R5, R6, R02, R03, R04, R05, R06;
     dh_rot(theta1,          PI/2,  R1);
     dh_rot(theta2,          0,     R2);
@@ -90,13 +101,39 @@ FK_Result forward_kinematics(double theta1, double theta2, double theta3,
     mat3_mul(R04, R5, R05);
     mat3_mul(R05, R6, R06);
 
+    // Posicion: O_i = O_(i-1) + R_(i-1)^0 * p_i , eslabon por eslabon.
+    Mat3 I3 = {{1,0,0},{0,1,0},{0,0,1}};
+    double O[3] = {0,0,0};
+    double p[3], Rp[3];
+
+    p[0]=0; p[1]=0; p[2]=L1;
+    mat3_vec(I3, p, Rp);
+    O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+    p[0]=L2*cos(theta2); p[1]=L2*sin(theta2); p[2]=0;
+    mat3_vec(R1, p, Rp);
+    O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+    p[0]=0; p[1]=0; p[2]=0;
+    mat3_vec(R02, p, Rp);
+    O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+    p[0]=0; p[1]=0; p[2]=LD4;
+    mat3_vec(R03, p, Rp);
+    O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+    p[0]=0; p[1]=0; p[2]=0;
+    mat3_vec(R04, p, Rp);
+    O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+    p[0]=0; p[1]=0; p[2]=LD6;
+    mat3_vec(R05, p, Rp);
+    O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+    double x = O[0], y = O[1], z = O[2];
+
     double R11 = R06[0][0], R21 = R06[1][0], R31 = R06[2][0];
     double R32 = R06[2][1], R33 = R06[2][2];
-    double R13 = R06[0][2], R23 = R06[1][2];
-
-    double x = x4 + LD6*R13;
-    double y = y4 + LD6*R23;
-    double z = z4 + LD6*R33;
 
     double mag   = sqrt(R11*R11 + R21*R21);
     double pitch = atan2(-R31, mag);
@@ -170,12 +207,19 @@ void USART3_SendString(const char *s) {
 }
 
 // ---------------------------------------------------------------------------
-// Contador de ciclos DWT->CYCCNT
+// TIM5 -- medicion de tiempo (reemplaza a DWT->CYCCNT, pedido del profesor).
+// PSC=0 (resolucion maxima). Aqui APB1=16MHz CON prescaler de bus =/1
+// (HPRE/PPRE1 en reset por defecto), asi que el reloj de TIM5 NO se dobla:
+// TIM5 corre a 16MHz -- distinto a la version de 216MHz, donde TIM5 SI se
+// dobla a 108MHz porque ahi el prescaler de APB1 es /4.
 // ---------------------------------------------------------------------------
-void DWT_Init(void) {
-    CoreDebug->DEMCR |= (1<<24);           // TRCENA
-    DWT->CYCCNT = 0;
-    DWT->CTRL |= (1<<0);                   // CYCCNTENA
+#define TIM5_CLK_MHZ 16.0
+
+void TIM5_Init(void) {
+    RCC->APB1ENR |= (1<<3);                // TIM5EN
+    TIM5->PSC = 0;                         // sin division, resolucion maxima
+    TIM5->ARR = 0xFFFFFFFF;                // maximo (32 bits)
+    TIM5->CNT = 0;
 }
 
 #define N_REPS 1000
@@ -191,15 +235,19 @@ void run_test_case(const char *nombre, double th1_deg, double th2_deg,
 
     char buf[180];
 
-    uint32_t c0 = DWT->CYCCNT;
+    TIM5->CNT = 0;
+    TIM5->CR1 |= (1<<0);
     FK_Result r = forward_kinematics(t1, t2, t3, t4, t5, t6);
-    uint32_t ciclos_frio = DWT->CYCCNT - c0;
+    TIM5->CR1 &= ~(1<<0);
+    uint32_t ticks_frio = TIM5->CNT;
 
-    c0 = DWT->CYCCNT;
+    TIM5->CNT = 0;
+    TIM5->CR1 |= (1<<0);
     for (int i = 0; i < N_REPS; i++) {
         r = forward_kinematics(t1, t2, t3, t4, t5, t6);
     }
-    uint32_t ciclos_prom = (DWT->CYCCNT - c0) / N_REPS;
+    TIM5->CR1 &= ~(1<<0);
+    uint32_t ticks_prom = TIM5->CNT / N_REPS;
 
     snprintf(buf, sizeof(buf),
         "\r\n=== %s ===\r\n"
@@ -214,10 +262,10 @@ void run_test_case(const char *nombre, double th1_deg, double th2_deg,
     USART3_SendString(buf);
 
     snprintf(buf, sizeof(buf),
-        "  ciclos (1 ejecucion, en frio)    = %lu  (%.3f us @ 16MHz)\r\n"
-        "  ciclos (promedio %d ejecuciones) = %lu  (%.3f us @ 16MHz)\r\n",
-        (unsigned long)ciclos_frio, ciclos_frio / 16.0,
-        N_REPS, (unsigned long)ciclos_prom, ciclos_prom / 16.0);
+        "  ticks TIM5 (1 ejecucion, en frio)    = %lu  (%.3f us)\r\n"
+        "  ticks TIM5 (promedio %d ejecuciones) = %lu  (%.3f us)\r\n",
+        (unsigned long)ticks_frio, ticks_frio / TIM5_CLK_MHZ,
+        N_REPS, (unsigned long)ticks_prom, ticks_prom / TIM5_CLK_MHZ);
     USART3_SendString(buf);
 }
 
@@ -241,14 +289,14 @@ int main(void) {
     SCB_EnableICache();
     SCB_EnableDCache();
 
-    DWT_Init();
+    TIM5_Init();
     USART3_Init();
     Boton_Init();
 
     SysTick->LOAD = 0x00FFFFFF;
     SysTick->CTRL |= (0b101);
 
-    USART3_SendString("\r\n\r\n=== Cinematica Directa 6 GDL real -- STM32F767ZI @ 16MHz (HSI, sin PLL) ===\r\n");
+    USART3_SendString("\r\n\r\n=== Cinematica Directa 6 GDL real -- STM32F767ZI @ 16MHz (HSI, sin PLL, TIM5) ===\r\n");
     USART3_SendString("Presiona el boton de usuario (B1) para repetir las 3 pruebas.\r\n");
     run_all_cases();
 

@@ -1,0 +1,98 @@
+=== Cinematica Directa 6 GDL real -- STM32F767ZI @ 216MHz (TIM5) ===
+Presiona el boton de usuario (B1) para repetir las 3 pruebas.
+
+=== Caso 1 [extendido] q=0 ===
+  entradas (grados): th1=0.0 th2=0.0 th3=0.0 th4=0.0 th5=0.0 th6=0.0
+  x=0.4200 m  y=-0.0000 m  z=0.0650 m
+  yaw=-90.00 deg  pitch=-0.00 deg  roll=-90.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 4710  (43.611 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 4172  (38.630 us)
+
+=== Caso 2 [SINGULARIDAD del 6R] th5=90 th6=90 ===
+  entradas (grados): th1=0.0 th2=0.0 th3=0.0 th4=0.0 th5=90.0 th6=90.0
+  x=0.2470 m  y=0.1730 m  z=0.0650 m
+  yaw=0.00 deg  pitch=90.00 deg  roll=180.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 4062  (37.611 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 4054  (37.537 us)
+
+=== Caso 3 [generico] ===
+  entradas (grados): th1=30.0 th2=20.0 th3=-15.0 th4=45.0 th5=60.0 th6=-70.0
+  x=0.2215 m  y=0.2502 m  z=0.2269 m
+  yaw=-42.50 deg  pitch=-34.56 deg  roll=-37.47 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 5556  (51.444 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 5514  (51.056 us)
+
+
+=== Cinematica Directa 6 GDL real -- STM32F767ZI @ 216MHz (TIM5) ===
+Presiona el boton de usuario (B1) para repetir las 3 pruebas.
+
+=== Caso 1 [extendido] q=0 ===
+  entradas (grados): th1=0.0 th2=0.0 th3=0.0 th4=0.0 th5=0.0 th6=0.0
+  x=0.4200 m  y=-0.0000 m  z=0.0650 m
+  yaw=-90.00 deg  pitch=-0.00 deg  roll=-90.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 4710  (43.611 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 4172  (38.630 us)
+
+=== Caso 2 [SINGULARIDAD del 6R] th5=90 th6=90 ===
+  entradas (grados): th1=0.0 th2=0.0 th3=0.0 th4=0.0 th5=90.0 th6=90.0
+  x=0.2470 m  y=0.1730 m  z=0.0650 m
+  yaw=0.00 deg  pitch=90.00 deg  roll=180.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 4062  (37.611 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 4054  (37.537 us)
+
+=== Caso 3 [generico] ===
+  entradas (grados): th1=30.0 th2=20.0 th3=-15.0 th4=45.0 th5=60.0 th6=-70.0
+  x=0.2215 m  y=0.2502 m  z=0.2269 m
+  yaw=-42.50 deg  pitch=-34.56 deg  roll=-37.47 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 5556  (51.444 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 5514  (51.056 us)
+
+
+=== Cinematica Directa 6 GDL real -- STM32F767ZI @ 16MHz (HSI, sin PLL, TIM5) ===
+Presiona el boton de usuario (B1) para repetir las 3 pruebas.
+
+=== Caso 1 [extendido] q=0 ===
+  entradas (grados): th1=0.0 th2=0.0 th3=0.0 th4=0.0 th5=0.0 th6=0.0
+  x=0.4200 m  y=-0.0000 m  z=0.0650 m
+  yaw=-90.00 deg  pitch=-0.00 deg  roll=-90.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 8778  (548.625 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 8329  (520.562 us)
+
+=== Caso 2 [SINGULARIDAD del 6R] th5=90 th6=90 ===
+  entradas (grados): th1=0.0 th2=0.0 th3=0.0 th4=0.0 th5=90.0 th6=90.0
+  x=0.2470 m  y=0.1730 m  z=0.0650 m
+  yaw=0.00 deg  pitch=90.00 deg  roll=180.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 8096  (506.000 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 8085  (505.312 us)
+
+=== Caso 3 [generico] ===
+  entradas (grados): th1=30.0 th2=20.0 th3=-15.0 th4=45.0 th5=60.0 th6=-70.0
+  x=0.2215 m  y=0.2502 m  z=0.2269 m
+  yaw=-42.50 deg  pitch=-34.56 deg  roll=-37.47 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 11023  (688.938 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 11000  (687.500 us)
+
+
+=== Cinematica Directa 6 GDL real -- STM32F767ZI @ 16MHz (HSI, sin PLL, TIM5) ===
+Presiona el boton de usuario (B1) para repetir las 3 pruebas.
+
+=== Caso 1 [extendido] q=0 ===
+  entradas (grados): th1=0.0 th2=0.0 th3=0.0 th4=0.0 th5=0.0 th6=0.0
+  x=0.4200 m  y=-0.0000 m  z=0.0650 m
+  yaw=-90.00 deg  pitch=-0.00 deg  roll=-90.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 8778  (548.625 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 8329  (520.562 us)
+
+=== Caso 2 [SINGULARIDAD del 6R] th5=90 th6=90 ===
+  entradas (grados): th1=0.0 th2=0.0 th3=0.0 th4=0.0 th5=90.0 th6=90.0
+  x=0.2470 m  y=0.1730 m  z=0.0650 m
+  yaw=0.00 deg  pitch=90.00 deg  roll=180.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 8096  (506.000 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 8085  (505.312 us)
+
+=== Caso 3 [generico] ===
+  entradas (grados): th1=30.0 th2=20.0 th3=-15.0 th4=45.0 th5=60.0 th6=-70.0
+  x=0.2215 m  y=0.2502 m  z=0.2269 m
+  yaw=-42.50 deg  pitch=-34.56 deg  roll=-37.47 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 11023  (688.938 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 11000  (687.500 us)
