@@ -1,25 +1,33 @@
 // ============================================================================
 // FK_6R_Geometrico_STM32.cpp
 //
-// Cinematica directa (metodo geometrico) del brazo de 6 GDL REAL (ya no el de
-// 5 articulaciones + roll de gripper del proyecto FK_5R_Geometrico_STM32).
+// Cinematica directa (metodo geometrico) del brazo de 6 GDL real.
 // Tabla DH corregida por el profesor ("regla 4": sistemas 3 y 5 coinciden con
 // 2 y 4) -- ver leccion 12 del repo del semillero para la derivacion completa.
 //
-// Diferencia clave respecto al brazo de 5R: aqui la POSICION deja de ser
-// independiente de la muñeca (theta4/theta5 SI mueven x,y,z porque la muñeca
-// tiene longitud fisica propia, Ld4 y Ld6) -- por eso la posicion se calcula
-// en dos partes (x4,y4,z4 hasta el sistema 4, mas el aporte de Ld6 en la
-// direccion de Z6 = columna 3 de R0_6).
+// ================== REVISION 2 (correccion del profesor) ==================
+// Dos cambios respecto a la primera version:
 //
-// Objetivo: medir cuantos ciclos de CPU tarda el STM32 en la cinematica
-// directa completa del 6R, para comparar contra el diseño de FPGA (que paso
-// de una version en paralelo con multiplicadores que no cabia en el chip, a
-// una version que reusa un solo multiplicador en serie: ~152-160 ciclos a
-// 50MHz -> ~3.0-3.2us de un start_in a un done_out).
+// 1) POSICION: antes se calculaba con un atajo (x4,y4,z4 hasta el sistema 4
+//    + Ld6*columna3(R0_6)) que ni el profesor ni el estudiante pudieron
+//    seguir facil. Ahora se usa el metodo del profesor (Inversa2R.pdf):
+//    acumular la posicion ESLABON POR ESLABON,
+//        O_i = O_(i-1) + R_(i-1)^0 * p_i ,  p_i = [a_i*cos(theta_i'), a_i*sin(theta_i'), d_i]
+//    reutilizando las MISMAS matrices R1,R02,R03,R04,R05 que ya se arman
+//    para la orientacion (no hace falta calcular nada extra). Da EXACTAMENTE
+//    los mismos numeros que el metodo viejo (verificado en Python antes de
+//    tocar este archivo) -- solo cambia que ahora se ve de donde sale cada
+//    pedazo.
 //
-// Reloj:  PLL a 216 MHz (igual que FK_5R_Geometrico_STM32).
-// Medicion: contador de ciclos DWT->CYCCNT (1 ciclo de resolucion).
+// 2) MEDICION DE TIEMPO: antes con DWT->CYCCNT (ciclos de CPU). Ahora con el
+//    periferico TIM5 (32 bits), como pidio el profesor -- reset CNT, arrancar
+//    CR1, correr el codigo, parar CR1, leer CNT, convertir a segundos con el
+//    periodo de tick conocido (PSC=0, resolucion maxima: el timer cuenta al
+//    reloj pleno del periferico).
+//
+// Reloj:  PLL a 216 MHz (maxima velocidad real del STM32F767ZI).
+// Medicion: TIM5->CNT, con TIM5 corriendo a 108MHz (APB1=54MHz, prescaler
+//          de bus != 1 -> el reloj de TIM se dobla, regla estandar del F7).
 // Salida:  USART3 (PD8=TX, PD9=RX, AF7) -> puerto virtual COM del ST-LINK.
 //         9600 baudios, BRR calculado para APB1=54MHz.
 // ============================================================================
@@ -74,33 +82,31 @@ void mat3_mul(const Mat3 A, const Mat3 B, Mat3 out) {
             out[i][j] = tmp[i][j];
 }
 
+// out = R * v (matriz 3x3 por vector 3x1)
+void mat3_vec(const Mat3 R, const double v[3], double out[3]) {
+    for (int i = 0; i < 3; i++) {
+        double s = 0;
+        for (int k = 0; k < 3; k++) s += R[i][k]*v[k];
+        out[i] = s;
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Cinematica directa geometrica, brazo de 6 GDL real.
 //
-// Posicion: PARTE A (formula cerrada, igual espiritu que el brazo de 5R pero
-// solo hasta el sistema 4, sin termino phi234 porque theta4 ya no es
-// coplanar con theta2,theta3 en esta tabla) + PARTE B (aporte de la muñeca,
-// Ld6 en la direccion de Z6 en el mundo = columna 3 de R0_6 -- ver leccion 12
-// seccion 3 para la derivacion completa de por que).
-//
 // Orientacion: cadena de matrices R1*R2*R3*R4*R5*R6 (igual que
 // Metodo_Geometrico_RPY_6R.m), NO la formula cerrada reducida con sympy que
-// usa la FPGA -- por la misma razon que en el brazo de 5R: la cadena de
-// matrices conserva el residuo de punto flotante de cos(pi/2) que resuelve
-// el reparto de la singularidad de forma consistente con MATLAB.
+// usa la FPGA -- misma razon que en el brazo de 5R: la cadena de matrices
+// conserva el residuo de punto flotante de cos(pi/2) que resuelve el reparto
+// de la singularidad de forma consistente con MATLAB.
+//
+// Posicion: metodo RECURSIVO del profesor (ver comentario de cabecera) --
+// se acumula eslabon por eslabon usando las mismas R1,R02,R03,R04,R05 de
+// arriba, NO un atajo aparte.
 // ---------------------------------------------------------------------------
 FK_Result forward_kinematics(double theta1, double theta2, double theta3,
                               double theta4, double theta5, double theta6) {
-    // Parte A: posicion del sistema 4
-    double phi2  = theta2;
-    double phi23 = theta2 + theta3;
-
-    double r4 = L2*cos(phi2) + LD4*cos(phi23);
-    double z4 = L1 + L2*sin(phi2) + LD4*sin(phi23);
-    double x4 = r4*cos(theta1);
-    double y4 = r4*sin(theta1);
-
-    // Orientacion: R05 = R1*R2*R3*R4*R5*R6 (misma tabla DH que el MATLAB)
+    // Orientacion: R06 = R1*R2*R3*R4*R5*R6 (misma tabla DH que el MATLAB)
     Mat3 R1, R2, R3, R4, R5, R6, R02, R03, R04, R05, R06;
     dh_rot(theta1,          PI/2,  R1);
     dh_rot(theta2,          0,     R2);
@@ -115,14 +121,47 @@ FK_Result forward_kinematics(double theta1, double theta2, double theta3,
     mat3_mul(R04, R5, R05);
     mat3_mul(R05, R6, R06);
 
+    // Posicion: O_i = O_(i-1) + R_(i-1)^0 * p_i , eslabon por eslabon.
+    // R_(i-1)^0 para cada paso: identidad, R1, R02, R03, R04, R05 (la
+    // rotacion acumulada HASTA el eslabon anterior -- ya estan arriba).
+    Mat3 I3 = {{1,0,0},{0,1,0},{0,0,1}};
+    double O[3] = {0,0,0};
+    double p[3], Rp[3];
+
+    // eslabon 1: a1=0, d1=L1
+    p[0]=0; p[1]=0; p[2]=L1;
+    mat3_vec(I3, p, Rp);
+    O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+    // eslabon 2: a2=L2, d2=0
+    p[0]=L2*cos(theta2); p[1]=L2*sin(theta2); p[2]=0;
+    mat3_vec(R1, p, Rp);
+    O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+    // eslabon 3: a3=0, d3=0 (sistema 3 = sistema 2, "regla 4" -- no aporta nada)
+    p[0]=0; p[1]=0; p[2]=0;
+    mat3_vec(R02, p, Rp);
+    O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+    // eslabon 4: a4=0, d4=Ld4
+    p[0]=0; p[1]=0; p[2]=LD4;
+    mat3_vec(R03, p, Rp);
+    O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+    // eslabon 5: a5=0, d5=0 (sistema 5 = sistema 4, "regla 4" -- no aporta nada)
+    p[0]=0; p[1]=0; p[2]=0;
+    mat3_vec(R04, p, Rp);
+    O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+    // eslabon 6: a6=0, d6=Ld6
+    p[0]=0; p[1]=0; p[2]=LD6;
+    mat3_vec(R05, p, Rp);
+    O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+    double x = O[0], y = O[1], z = O[2];
+
     double R11 = R06[0][0], R21 = R06[1][0], R31 = R06[2][0];
     double R32 = R06[2][1], R33 = R06[2][2];
-    double R13 = R06[0][2], R23 = R06[1][2];  // columna 3 -- direccion de Z6 en el mundo
-
-    // Parte B: se le suma el aporte de la muñeca (Ld6) en la direccion de Z6
-    double x = x4 + LD6*R13;
-    double y = y4 + LD6*R23;
-    double z = z4 + LD6*R33;
 
     double mag   = sqrt(R11*R11 + R21*R21); // = |cos(pitch)|
     double pitch = atan2(-R31, mag);
@@ -209,12 +248,19 @@ void USART3_SendString(const char *s) {
 }
 
 // ---------------------------------------------------------------------------
-// Contador de ciclos DWT->CYCCNT
+// TIM5 -- medicion de tiempo (reemplaza a DWT->CYCCNT, pedido del profesor).
+// TIM5 es de 32 bits en el F767 -- sin riesgo de overflow en mediciones de
+// decenas de us. PSC=0 (resolucion maxima): el timer cuenta al reloj pleno
+// del periferico. APB1=54MHz con prescaler de bus != 1 -> TIM5 corre a
+// 2*APB1 = 108MHz (regla estandar del arbol de reloj del STM32F7).
 // ---------------------------------------------------------------------------
-void DWT_Init(void) {
-    CoreDebug->DEMCR |= (1<<24);           // TRCENA
-    DWT->CYCCNT = 0;
-    DWT->CTRL |= (1<<0);                   // CYCCNTENA
+#define TIM5_CLK_MHZ 108.0
+
+void TIM5_Init(void) {
+    RCC->APB1ENR |= (1<<3);                // TIM5EN
+    TIM5->PSC = 0;                         // sin division, resolucion maxima
+    TIM5->ARR = 0xFFFFFFFF;                // maximo (32 bits)
+    TIM5->CNT = 0;
 }
 
 #define N_REPS 1000  // repeticiones para el promedio en estado estable (cache caliente)
@@ -230,18 +276,21 @@ void run_test_case(const char *nombre, double th1_deg, double th2_deg,
 
     char buf[180];
 
-    // Medicion "en frio" -- una sola ejecucion, comparable directo con los
-    // ~152-160 ciclos de la FPGA (version con multiplicador reutilizado)
-    uint32_t c0 = DWT->CYCCNT;
+    // Medicion "en frio" -- una sola ejecucion
+    TIM5->CNT = 0;
+    TIM5->CR1 |= (1<<0);                   // arranca el conteo
     FK_Result r = forward_kinematics(t1, t2, t3, t4, t5, t6);
-    uint32_t ciclos_frio = DWT->CYCCNT - c0;
+    TIM5->CR1 &= ~(1<<0);                  // para el conteo
+    uint32_t ticks_frio = TIM5->CNT;
 
     // Medicion en estado estable -- promedio de N_REPS ejecuciones seguidas
-    c0 = DWT->CYCCNT;
+    TIM5->CNT = 0;
+    TIM5->CR1 |= (1<<0);
     for (int i = 0; i < N_REPS; i++) {
         r = forward_kinematics(t1, t2, t3, t4, t5, t6);
     }
-    uint32_t ciclos_prom = (DWT->CYCCNT - c0) / N_REPS;
+    TIM5->CR1 &= ~(1<<0);
+    uint32_t ticks_prom = TIM5->CNT / N_REPS;
 
     snprintf(buf, sizeof(buf),
         "\r\n=== %s ===\r\n"
@@ -256,10 +305,10 @@ void run_test_case(const char *nombre, double th1_deg, double th2_deg,
     USART3_SendString(buf);
 
     snprintf(buf, sizeof(buf),
-        "  ciclos (1 ejecucion, en frio)    = %lu  (%.3f us @ 216MHz)\r\n"
-        "  ciclos (promedio %d ejecuciones) = %lu  (%.3f us @ 216MHz)\r\n",
-        (unsigned long)ciclos_frio, ciclos_frio / 216.0,
-        N_REPS, (unsigned long)ciclos_prom, ciclos_prom / 216.0);
+        "  ticks TIM5 (1 ejecucion, en frio)    = %lu  (%.3f us)\r\n"
+        "  ticks TIM5 (promedio %d ejecuciones) = %lu  (%.3f us)\r\n",
+        (unsigned long)ticks_frio, ticks_frio / TIM5_CLK_MHZ,
+        N_REPS, (unsigned long)ticks_prom, ticks_prom / TIM5_CLK_MHZ);
     USART3_SendString(buf);
 }
 
@@ -289,14 +338,14 @@ int main(void) {
     SCB_EnableICache();                    // I-cache y D-cache del Cortex-M7
     SCB_EnableDCache();
 
-    DWT_Init();
+    TIM5_Init();
     USART3_Init();
     Boton_Init();
 
     SysTick->LOAD = 0x00FFFFFF;
     SysTick->CTRL |= (0b101);
 
-    USART3_SendString("\r\n\r\n=== Cinematica Directa 6 GDL real -- STM32F767ZI @ 216MHz ===\r\n");
+    USART3_SendString("\r\n\r\n=== Cinematica Directa 6 GDL real -- STM32F767ZI @ 216MHz (TIM5) ===\r\n");
     USART3_SendString("Presiona el boton de usuario (B1) para repetir las 3 pruebas.\r\n");
     run_all_cases();
 

@@ -438,14 +438,20 @@ método que el profesor sí puede seguir.
 ## 10. Comparación con STM32: hardware dedicado vs. software, y el efecto del reloj
 
 El puerto completo a STM32 (dos proyectos Keil, mismo código de cinemática, 216MHz vs 16MHz sin
-PLL, explicado paso a paso con el log real del UART) quedó documentado aparte en la
+PLL, explicado paso a paso con el log real del UART, ya con la posición recursiva y la medición
+por TIM5 de la sección 3.1) quedó documentado aparte en la
 **[lección 13](../13_Cinematica_Directa_6GDL_STM32/README.md)**. Resumen del resultado:
 
 | | FPGA (50 MHz) | STM32 @ 216 MHz | STM32 @ 16 MHz |
 |---|---|---|---|
-| Tiempo (constante / según caso) | ~3.1 µs | 33.5–48.8 µs | 452–659 µs |
-| **Veces más lento que la FPGA** | 1× | **10.8×–15.7×** | **146×–212×** |
+| Tiempo | **~4.05 µs, siempre** (fijo, cualquier ángulo) | 37.5–51.4 µs (según el ángulo) | 505.3–688.9 µs (según el ángulo) |
+| **Veces más lento que la FPGA** | 1× | **~9.3×–12.7×** | **~124.8×–170.1×** |
 
 A pesar de que el STM32 a máxima velocidad tiene un reloj **4.3 veces más rápido** que la FPGA,
-termina el mismo cálculo entre **10.8 y 15.7 veces más lento** — hardware dedicado en pipeline
-le gana por mucho a software secuencial, sin importar cuánto reloj se le meta al software.
+termina el mismo cálculo entre **~9.3 y 12.7 veces más lento** — hardware dedicado en pipeline le
+gana por mucho a software secuencial, sin importar cuánto reloj se le meta al software. Y hay una
+segunda diferencia, más allá de la velocidad: en la FPGA ese tiempo es **el mismo sin importar el
+ángulo** (CORDIC de iteraciones fijas); en el STM32 varía hasta un **32%** según qué tan "limpio"
+sea el ángulo de entrada, porque `cos()`/`sin()` en software usan reducción de rango con ramas
+condicionales — la FPGA no solo es más rápida, es **determinística** (ver
+[lección 13, sección 9](../13_Cinematica_Directa_6GDL_STM32/README.md#9-análisis-de-los-resultados)).

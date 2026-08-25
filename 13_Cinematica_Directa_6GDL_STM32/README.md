@@ -15,6 +15,15 @@ preguntas distintas:
 2. **¿Cuánto pesa el reloj mismo?** — el mismo STM32, mismo código, a su velocidad de fábrica
    (16 MHz, sin PLL), sin tocar una sola línea de la lógica de cálculo.
 
+> **Segunda corrección del profesor (después de la primera corrida de este puerto):** igual que
+> en la [lección 12](../12_Cinematica_Directa_6GDL/README.md#31-segunda-correccion-el-metodo-recursivo-de-verdad-inversa2rpdf),
+> la posición se rehizo con el método geométrico **recursivo** (`Inversa2R.pdf`) en vez del atajo
+> trigonométrico, y la medición de tiempo pasó de `DWT->CYCCNT` al periférico **TIM5** (pedido
+> explícito para tener una herramienta de medición estándar y determinística). Este documento ya
+> refleja el código y los datos **después** de esas dos correcciones — ver sección 4.2 (posición
+> recursiva), sección 6 (TIM5) y sección 9 (un hallazgo nuevo sobre por qué el software, a
+> diferencia del CORDIC de la FPGA, no tarda lo mismo para cualquier ángulo).
+
 > **Plataforma:** STM32F767ZI en Nucleo-144 (Cortex-M7, FPU doble precisión) · Keil µVision5
 > **Estilo:** 100% a registro (`RCC->...`, `GPIOD->...`), sin HAL ni LL — mismo estilo que el
 > resto de proyectos STM32 del semillero.
@@ -28,8 +37,11 @@ preguntas distintas:
 2. [La geometría del brazo, en C](#2-la-geometría-del-brazo-en-c)
 3. [Matrices DH genéricas: `dh_rot()` y `mat3_mul()`](#3-matrices-dh-genéricas-dh_rot-y-mat3_mul)
 4. [`forward_kinematics()`, paso a paso](#4-forward_kinematics-paso-a-paso)
+   - 4.1 Orientación — cadena de matrices
+   - 4.2 Posición — método geométrico recursivo (segunda corrección del profesor)
+   - 4.3 Extracción de yaw/pitch/roll
 5. [Dos configuraciones de reloj, explicadas registro por registro](#5-dos-configuraciones-de-reloj-explicadas-registro-por-registro)
-6. [UART3, DWT y el botón de usuario](#6-uart3-dwt-y-el-botón-de-usuario)
+6. [UART3, TIM5 y el botón de usuario](#6-uart3-tim5-y-el-botón-de-usuario)
 7. [Cómo se mide: "en frío" vs. promedio de 1000](#7-cómo-se-mide-en-frío-vs-promedio-de-1000)
 8. [La salida real del UART](#8-la-salida-real-del-uart)
 9. [Análisis de los resultados](#9-análisis-de-los-resultados)
@@ -94,23 +106,7 @@ directa, sin trucos.
 
 ## 4. `forward_kinematics()`, paso a paso
 
-### 4.1 Posición — parte A (hasta el sistema 4)
-
-```cpp
-double phi2  = theta2;
-double phi23 = theta2 + theta3;
-
-double r4 = L2*cos(phi2) + LD4*cos(phi23);
-double z4 = L1 + L2*sin(phi2) + LD4*sin(phi23);
-double x4 = r4*cos(theta1);
-double y4 = r4*sin(theta1);
-```
-
-Idéntico al atajo geométrico de siempre (trigonometría plana, sin matrices) — ver
-[lección 12, sección 3](../12_Cinematica_Directa_6GDL/README.md#3-el-hallazgo-la-posicion-ya-no-es-independiente-de-la-muñeca)
-para la derivación completa de por qué solo llega hasta el sistema 4.
-
-### 4.2 Orientación — cadena de matrices, NO la fórmula cerrada
+### 4.1 Orientación — cadena de matrices, NO la fórmula cerrada
 
 ```cpp
 Mat3 R1, R2, R3, R4, R5, R6, R02, R03, R04, R05, R06;
@@ -138,16 +134,84 @@ consistente con cómo lo resuelve MATLAB (que también multiplica matrices, no u
 reducida). Si aquí se usara la fórmula cerrada de la FPGA, el STM32 caería en un
 `atan2(0,0)` en la singularidad — un caso degenerado distinto, que no reconstruye la matriz real.
 
-### 4.3 Posición — parte B (aporte de la muñeca) y extracción RPY
+### 4.2 Posición — método geométrico RECURSIVO (segunda corrección del profesor)
+
+La primera versión de este puerto calculaba la posición con un atajo trigonométrico
+(`x4,y4,z4` hasta el sistema 4 + `Ld6*columna3(R0_6)` para la muñeca) — daba los números
+correctos, pero el profesor lo rechazó por la misma razón que en la FPGA
+([lección 12, sección 3.1](../12_Cinematica_Directa_6GDL/README.md#31-segunda-correccion-el-metodo-recursivo-de-verdad-inversa2rpdf)):
+no era un método reconocible. Se reemplazó por la acumulación eslabón por eslabón
+(`Inversa2R.pdf`), reutilizando las **mismas** matrices `R1,R02,R03,R04,R05` que ya arma la
+sección 4.1 — no hace falta calcular nada extra para la posición, solo reordenar cómo se usa lo
+que ya existía:
+
+```cpp
+// out = R * v (matriz 3x3 por vector 3x1)
+void mat3_vec(const Mat3 R, const double v[3], double out[3]) {
+    for (int i = 0; i < 3; i++) {
+        double s = 0;
+        for (int k = 0; k < 3; k++) s += R[i][k]*v[k];
+        out[i] = s;
+    }
+}
+...
+Mat3 I3 = {{1,0,0},{0,1,0},{0,0,1}};
+double O[3] = {0,0,0};
+double p[3], Rp[3];
+
+// eslabon 1: a1=0, d1=L1
+p[0]=0; p[1]=0; p[2]=L1;
+mat3_vec(I3, p, Rp);
+O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+// eslabon 2: a2=L2, d2=0
+p[0]=L2*cos(theta2); p[1]=L2*sin(theta2); p[2]=0;
+mat3_vec(R1, p, Rp);
+O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+// eslabon 3: a3=0, d3=0 (sistema 3 = sistema 2, "regla 4" -- no aporta nada)
+p[0]=0; p[1]=0; p[2]=0;
+mat3_vec(R02, p, Rp);
+O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+// eslabon 4: a4=0, d4=Ld4
+p[0]=0; p[1]=0; p[2]=LD4;
+mat3_vec(R03, p, Rp);
+O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+// eslabon 5: a5=0, d5=0 (sistema 5 = sistema 4, "regla 4" -- no aporta nada)
+p[0]=0; p[1]=0; p[2]=0;
+mat3_vec(R04, p, Rp);
+O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+// eslabon 6: a6=0, d6=Ld6
+p[0]=0; p[1]=0; p[2]=LD6;
+mat3_vec(R05, p, Rp);
+O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+double x = O[0], y = O[1], z = O[2];
+```
+
+Cada eslabón `i` aporta su desplazamiento local `p_i` (columna `d_i`/`a_i` de su propia fila DH),
+rotado al marco de la base con la rotación acumulada **hasta el eslabón anterior**
+(`R_(i-1)^0`) y sumado a donde ya iba el brazo. Idéntica fórmula, mismo orden de matrices, que
+[`Metodo_Geometrico_RPY_6R.m`](../12_Cinematica_Directa_6GDL/Metodo_Geometrico_RPY_6R.m). Da
+**exactamente los mismos números** que el atajo viejo — verificado primero en Python antes de
+tocar este archivo.
+
+> **Gotcha real, no cosmético:** este cambio agregó suficientes variables locales (`Mat3 I3`, más
+> los arreglos `O`/`p`/`Rp`, sumados a las 11 matrices `Mat3` que ya usaba la orientación) para
+> que `forward_kinematics()` **desbordara el stack por defecto de Keil (1 KB)** — el síntoma fue
+> el chip reiniciándose en bucle, imprimiendo el banner una y otra vez sin llegar nunca a mostrar
+> el resultado del Caso 1. Se subió `Stack_Size` de `0x400` a `0x1000` (4 KB) en
+> `startup_stm32f767xx.s` de los dos proyectos — el F767 tiene 512 KB de RAM, así que sigue
+> siendo insignificante.
+
+### 4.3 Extracción de yaw/pitch/roll
 
 ```cpp
 double R11 = R06[0][0], R21 = R06[1][0], R31 = R06[2][0];
 double R32 = R06[2][1], R33 = R06[2][2];
-double R13 = R06[0][2], R23 = R06[1][2];  // columna 3 -- direccion de Z6 en el mundo
-
-double x = x4 + LD6*R13;
-double y = y4 + LD6*R23;
-double z = z4 + LD6*R33;
 
 double mag   = sqrt(R11*R11 + R21*R21);
 double pitch = atan2(-R31, mag);
@@ -162,10 +226,8 @@ if (mag < EPS_SINGULARIDAD) {
 }
 ```
 
-`R13,R23,R33` (columna 3 de `R0_6`) son la dirección de `Z6` en el mundo — se reutilizan tal
-cual para la posición, mismo razonamiento que en VHDL (lección 12, sección 3). `pitch` se
-calcula siempre; `yaw`/`roll` se estandarizan a `0`/`180°` en la singularidad, acordado con el
-profesor, mismo criterio en las tres plataformas (FPGA, MATLAB, STM32).
+`pitch` se calcula siempre; `yaw`/`roll` se estandarizan a `0`/`180°` en la singularidad, acordado
+con el profesor, mismo criterio en las tres plataformas (FPGA, MATLAB, STM32).
 
 ---
 
@@ -226,26 +288,43 @@ HSI interno (oscilador RC de 16MHz, sin cristal externo) directo a `SYSCLK`, sin
 Over-drive, sin wait-states de Flash. La función existe solo para dejarlo **explícito** en el
 código (documentar la intención), no porque haga falta tocar ningún registro.
 
-Todo lo demás — `USART3_Init()`, `DWT_Init()`, `Boton_Init()`, `forward_kinematics()` — es
+Todo lo demás — `USART3_Init()`, `TIM5_Init()`, `Boton_Init()`, `forward_kinematics()` — es
 **exactamente el mismo código** en los dos archivos. La única diferencia real entre los dos
-proyectos son estas dos funciones y las constantes `AHB_CLK_HZ`/`APB1_CLK_HZ` que dependen de
-ellas (`216000000`/`54000000` vs `16000000`/`16000000`, usadas para recalcular el `BRR` del UART
-y el conteo del `SysTick`).
+proyectos son estas dos funciones, la constante `TIM5_CLK_MHZ` (sección 6), y las constantes
+`AHB_CLK_HZ`/`APB1_CLK_HZ` (`216000000`/`54000000` vs `16000000`/`16000000`, usadas para
+recalcular el `BRR` del UART y el conteo del `SysTick`).
 
 ---
 
-## 6. UART3, DWT y el botón de usuario
+## 6. UART3, TIM5 y el botón de usuario
 
-Reutilizados tal cual del proyecto del brazo de 5R
-(`C:\Keil_Ejercicios\FK_5R_Geometrico_STM32\`), sin cambios de lógica:
+**Cambio del profesor:** la medición de tiempo pasó de `DWT->CYCCNT` al periférico **TIM5**
+(mismo patrón que usa el curso con I2C: reset `CNT`, arrancar con `CR1|=1`, correr el código,
+parar con `CR1&=~1`, leer `CNT`) — una herramienta de medición estándar y determinística, en vez
+del contador de ciclos de depuración.
 
+```cpp
+#define TIM5_CLK_MHZ 108.0   // 16.0 en el proyecto de 16MHz -- ver nota abajo
+
+void TIM5_Init(void) {
+    RCC->APB1ENR |= (1<<3);                // TIM5EN
+    TIM5->PSC = 0;                         // sin division, resolucion maxima
+    TIM5->ARR = 0xFFFFFFFF;                // maximo (32 bits)
+    TIM5->CNT = 0;
+}
+```
+
+- **TIM5 es de 32 bits** en el F767 — sin riesgo de overflow en mediciones de decenas/cientos de
+  µs. `PSC=0` (resolución máxima): el timer cuenta al reloj pleno del periférico.
+- **El reloj de TIM5 NO es el mismo en los dos proyectos**, y es la razón por la que
+  `TIM5_CLK_MHZ` cambia entre archivos: a 216MHz, `APB1=54MHz` con el prescaler del bus en
+  `/4` (≠1) → por la regla estándar del árbol de reloj del STM32F7, el reloj de los timers en ese
+  bus se **dobla** → TIM5 corre a **108MHz**. A 16MHz sin PLL, `APB1=16MHz` con el prescaler en
+  `/1` → no se dobla, TIM5 corre a los mismos **16MHz**. `ticks / TIM5_CLK_MHZ` da los
+  microsegundos reales en los dos casos.
 - **USART3** (PD8=TX, PD9=RX, AF7) — en las Nucleo-144, el puerto virtual COM del ST-LINK está
   cableado a USART3, no a UART7. `BRR` se recalcula según `APB1_CLK_HZ`, así que el mismo
   código de inicialización da 9600 baudios reales sin importar el reloj del sistema.
-- **DWT->CYCCNT** — contador de ciclos de 32 bits, resolución de 1 ciclo, se activa una vez en
-  `DWT_Init()` y nunca se reinicia entre casos de prueba (por diseño: así el conteo de ciclos de
-  cada caso es limpio, `delta = CYCCNT_final - CYCCNT_inicial`, sin importar cuánto tiempo lleve
-  corriendo el programa).
 - **Botón B1 (PC13)** — con pull-up interno por software (la Nucleo-144 no trae resistencia
   externa en ese pin), detectado por flanco de bajada con antirrebote de 30ms por `SysTick`.
 
@@ -254,18 +333,23 @@ Reutilizados tal cual del proyecto del brazo de 5R
 ## 7. Cómo se mide: "en frío" vs. promedio de 1000
 
 ```cpp
-uint32_t c0 = DWT->CYCCNT;
+TIM5->CNT = 0;
+TIM5->CR1 |= (1<<0);                   // arranca el conteo
 FK_Result r = forward_kinematics(t1, t2, t3, t4, t5, t6);
-uint32_t ciclos_frio = DWT->CYCCNT - c0;
+TIM5->CR1 &= ~(1<<0);                  // para el conteo
+uint32_t ticks_frio = TIM5->CNT;
 
-c0 = DWT->CYCCNT;
+TIM5->CNT = 0;
+TIM5->CR1 |= (1<<0);
 for (int i = 0; i < N_REPS; i++) {
     r = forward_kinematics(t1, t2, t3, t4, t5, t6);
 }
-uint32_t ciclos_prom = (DWT->CYCCNT - c0) / N_REPS;
+TIM5->CR1 &= ~(1<<0);
+uint32_t ticks_prom = TIM5->CNT / N_REPS;
 ```
 
-Dos mediciones por caso, a propósito:
+Dos mediciones por caso, a propósito (el patrón `CNT=0 -> CR1|=1 -> ... -> CR1&=~1 -> lee CNT` es
+el mismo que pidió el profesor para el ejemplo de I2C con TIM5):
 
 - **"En frío"** — una sola ejecución. Comparable directo con la FPGA, que también hace todo en
   una sola pasada por su pipeline sin nada "precalentado".
@@ -279,79 +363,126 @@ Dos mediciones por caso, a propósito:
 
 Log completo capturado por HTerm, en las dos velocidades, con el botón de usuario presionado
 varias veces para confirmar que los resultados son estables entre corridas — archivo completo en
-[`output_2026-08-18_STM32_6GDL_216MHz_vs_16MHz.log`](output_2026-08-18_STM32_6GDL_216MHz_vs_16MHz.log).
+[`output_2026-08-19_STM32_6GDL_TIM5_posicion_recursiva.log`](output_2026-08-19_STM32_6GDL_TIM5_posicion_recursiva.log).
 Extracto (una corrida de cada velocidad):
 
 ```
-=== Cinematica Directa 6 GDL real -- STM32F767ZI @ 216MHz ===
+=== Cinematica Directa 6 GDL real -- STM32F767ZI @ 216MHz (TIM5) ===
 
 === Caso 1 [extendido] q=0 ===
   entradas (grados): th1=0.0 th2=0.0 th3=0.0 th4=0.0 th5=0.0 th6=0.0
   x=0.4200 m  y=-0.0000 m  z=0.0650 m
   yaw=-90.00 deg  pitch=-0.00 deg  roll=-90.00 deg
-  ciclos (1 ejecucion, en frio)    = 8428  (39.019 us @ 216MHz)
-  ciclos (promedio 1000 ejecuciones) = 7452  (34.500 us @ 216MHz)
+  ticks TIM5 (1 ejecucion, en frio)    = 4710  (43.611 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 4172  (38.630 us)
 
 === Caso 2 [SINGULARIDAD del 6R] th5=90 th6=90 ===
   entradas (grados): th1=0.0 th2=0.0 th3=0.0 th4=0.0 th5=90.0 th6=90.0
   x=0.2470 m  y=0.1730 m  z=0.0650 m
   yaw=0.00 deg  pitch=90.00 deg  roll=180.00 deg
-  ciclos (1 ejecucion, en frio)    = 7232  (33.481 us @ 216MHz)
-  ciclos (promedio 1000 ejecuciones) = 7240  (33.519 us @ 216MHz)
+  ticks TIM5 (1 ejecucion, en frio)    = 4062  (37.611 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 4054  (37.537 us)
 
 === Caso 3 [generico] ===
   entradas (grados): th1=30.0 th2=20.0 th3=-15.0 th4=45.0 th5=60.0 th6=-70.0
   x=0.2215 m  y=0.2502 m  z=0.2269 m
   yaw=-42.50 deg  pitch=-34.56 deg  roll=-37.47 deg
-  ciclos (1 ejecucion, en frio)    = 10636  (49.241 us @ 216MHz)
-  ciclos (promedio 1000 ejecuciones) = 10545  (48.819 us @ 216MHz)
+  ticks TIM5 (1 ejecucion, en frio)    = 5556  (51.444 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 5514  (51.056 us)
 
 
-=== Cinematica Directa 6 GDL real -- STM32F767ZI @ 16MHz (HSI, sin PLL) ===
+=== Cinematica Directa 6 GDL real -- STM32F767ZI @ 16MHz (HSI, sin PLL, TIM5) ===
 
 === Caso 1 [extendido] q=0 ===
-  ciclos (1 ejecucion, en frio)    = 7849  (490.562 us @ 16MHz)
-  ciclos (promedio 1000 ejecuciones) = 7451  (465.688 us @ 16MHz)
+  entradas (grados): th1=0.0 th2=0.0 th3=0.0 th4=0.0 th5=0.0 th6=0.0
+  x=0.4200 m  y=-0.0000 m  z=0.0650 m
+  yaw=-90.00 deg  pitch=-0.00 deg  roll=-90.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 8778  (548.625 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 8329  (520.562 us)
 
 === Caso 2 [SINGULARIDAD del 6R] th5=90 th6=90 ===
-  ciclos (1 ejecucion, en frio)    = 7234  (452.125 us @ 16MHz)
-  ciclos (promedio 1000 ejecuciones) = 7239  (452.438 us @ 16MHz)
+  entradas (grados): th1=0.0 th2=0.0 th3=0.0 th4=0.0 th5=90.0 th6=90.0
+  x=0.2470 m  y=0.1730 m  z=0.0650 m
+  yaw=0.00 deg  pitch=90.00 deg  roll=180.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 8096  (506.000 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 8085  (505.312 us)
 
 === Caso 3 [generico] ===
-  ciclos (1 ejecucion, en frio)    = 10581  (661.312 us @ 16MHz)
-  ciclos (promedio 1000 ejecuciones) = 10546  (659.125 us @ 16MHz)
+  entradas (grados): th1=30.0 th2=20.0 th3=-15.0 th4=45.0 th5=60.0 th6=-70.0
+  x=0.2215 m  y=0.2502 m  z=0.2269 m
+  yaw=-42.50 deg  pitch=-34.56 deg  roll=-37.47 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 11023  (688.938 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 11000  (687.500 us)
 ```
 
 Posición y orientación coincidieron **exactas** con lo esperado (misma verificación que la
 [tabla de la lección 12, sección 7](../12_Cinematica_Directa_6GDL/README.md#7-verificación-modelsim-y-matlab)),
-en las dos velocidades, en las tres corridas repetidas — confirma que el puerto a C está bien
-hecho, independiente del reloj.
+en las dos velocidades, en varias corridas repetidas — confirma que el puerto a C del método
+recursivo está bien hecho, independiente del reloj.
 
 ---
 
 ## 9. Análisis de los resultados
 
-**Hallazgo 1 — los ciclos no cambian con el reloj, el tiempo sí.** El promedio de ciclos es
-prácticamente idéntico entre 216MHz y 16MHz (7,452 vs 7,451 · 7,240 vs 7,239 · 10,545 vs
-10,546). Tiene sentido: `DWT->CYCCNT` cuenta ciclos de CPU — el mismo código ejecuta el mismo
-número de instrucciones sin importar qué tan rápido tiquetee el reloj. Lo que cambia es cuánto
-dura cada ciclo, por eso el tiempo real sí escala ~13.5× entre las dos tarjetas (justo la
-relación 216/16).
+Con `TIM5_CLK_MHZ` conocido en los dos proyectos (108MHz a 216MHz, 16MHz a 16MHz — sección 6),
+los ticks de TIM5 se pueden convertir a **ciclos de CPU reales** (a 16MHz, TIM5 corre 1:1 con el
+núcleo, así que ahí los ticks *son* ciclos directamente; a 216MHz, ciclos = ticks × 2):
 
-**Hallazgo 2 — la primera ejecución a 216MHz paga un costo que no aparece en ningún otro caso.**
-Caso 1 "en frío" da 8,428 ciclos contra un promedio de 7,452 — 976 ciclos de diferencia, que no
-se repite en los Casos 2/3 (ahí "en frío" ≈ promedio) ni en ninguna medición a 16MHz (brecha de
-solo 398 ciclos). Explicación: el Caso 1 es la *primera* vez que se ejecuta
-`forward_kinematics()` desde el arranque, con el I-cache totalmente frío — cada instrucción se
-trae de Flash, que a 216MHz necesita **7 ciclos de espera** por acceso (sección 5.1) contra
-prácticamente 0 a 16MHz. Para cuando corren los Casos 2 y 3, el código ya quedó cacheado por las
-1000 repeticiones del Caso 1 — por eso ahí la brecha desaparece.
+| Caso | Ciclos (en frío) | Ciclos (promedio 1000) |
+|---|---|---|
+| 1 — extendido | ~8,780–9,420 | **~8,330–8,340** |
+| 2 — singularidad | ~8,090–8,120 | **~8,085–8,110** |
+| 3 — genérico | ~11,020–11,110 | **~11,000–11,030** |
 
-**Hallazgo 3 — la singularidad es el caso más rápido, y se explica en el código mismo.** El
-Caso 2 (singularidad) evita 2 llamadas a `atan2()` — `yaw` y `roll` se fijan a constantes en la
-rama `if (mag < EPS_SINGULARIDAD)` (sección 4.3) en vez de calcularse. Eso explica los ~200
-ciclos de diferencia frente al Caso 1, que sí calcula las 3 (`yaw`, `pitch`, `roll`) con
-`atan2()`.
+**Hallazgo 1 — los ciclos no cambian con el reloj, el tiempo sí.** El promedio de ciclos
+(convertido) es prácticamente idéntico entre 216MHz y 16MHz en los 3 casos (diferencias de
+15–28 ciclos, <0.3%). Tiene sentido: el mismo código ejecuta el mismo número de instrucciones sin
+importar qué tan rápido tiquetee el reloj — lo que cambia es cuánto dura cada ciclo, por eso el
+tiempo real sí escala ~13.5× entre las dos tarjetas (justo la relación 216/16).
+
+**Hallazgo 2 — la primera ejecución paga un costo de caché que es mayor a 216MHz, pero no es
+exclusivo de esa velocidad.** Caso 1 "en frío" tarda más ciclos que el promedio en **ambos**
+relojes: ~1,076 ciclos más a 216MHz (13% de sobrecosto), ~449 ciclos más a 16MHz (5.4%) — en los
+Casos 2 y 3 esa brecha prácticamente desaparece en los dos relojes. Es la *primera* vez que se
+ejecuta `forward_kinematics()` desde el arranque, con el I-cache totalmente frío; para cuando
+corren los Casos 2 y 3, el código ya quedó cacheado por las 1000 repeticiones del Caso 1. La parte
+que sí depende del reloj es **cuánto pesa** ese primer fallo de caché: a 216MHz, Flash necesita
+**7 ciclos de espera** por acceso (sección 5.1) contra prácticamente 0 a 16MHz, así que cada
+instrucción nueva que hay que traer de Flash cuesta más ciclos exactamente ahí — de ahí que la
+brecha sea más del doble, en proporción, a 216MHz que a 16MHz.
+
+**Hallazgo 3 — por qué el Caso 3 tarda ~32% más que el Caso 1, en los dos relojes por igual (el
+argumento para el profesor).** Caso 1 y Caso 3 ejecutan **el mismo camino de código**: ninguno
+cae en la rama de singularidad, así que los dos llaman `atan2()` exactamente 3 veces y pasan por
+las mismas 6 llamadas a `dh_rot()` (12 evaluaciones de `cos()`/`sin()` en total). La única
+diferencia entre los dos casos es el **valor numérico** de `theta1..theta6` — todo cero en el
+Caso 1, seis ángulos genéricos (30°, 20°, -15°, 45°, 60°, -70°) en el Caso 3. Aun así, el Caso 3
+tarda **~32% más ciclos** (11,000 vs 8,329 a 16MHz; 11,028 vs 8,344 a 216MHz — el mismo ~32% en
+los dos relojes, lo que confirma que es un costo en *instrucciones*, no un artefacto de reloj).
+
+Esto se explica por cómo funciona `cos()`/`sin()` en la librería matemática de software
+(ARM Compiler 6 `libm`), y es la razón de fondo por la que el software **no** es determinístico
+como el CORDIC de la FPGA:
+
+- `cos(0)` y `sin(0)` (y, en el Caso 2, `cos(90°)`/`sin(90°)`) son ángulos "exactos" para los que
+  la librería puede devolver el resultado casi sin trabajo — sin necesidad de la reducción de
+  rango completa que exige un ángulo arbitrario.
+- Los ángulos del Caso 3 no son múltiplos limpios de nada: cada una de las 12 llamadas a
+  `cos()`/`sin()` tiene que hacer la reducción de rango completa (llevar el ángulo a un intervalo
+  pequeño restando múltiplos de 90°) y evaluar el polinomio de aproximación completo — más
+  instrucciones, más ciclos, por cada una de las 12 llamadas.
+- El CORDIC de la FPGA (`cordic_sincos_16.vhd`, lección 12) **no tiene este problema**: es un
+  circuito de iteraciones fijas (`N_ITER=12`, siempre) que solo mira el signo del residuo en cada
+  paso — nunca evalúa "qué tan complicado" es el ángulo ni toma atajos. Por diseño, tarda lo
+  mismo para cualquier ángulo, incluido el peor caso. El software, en cambio, tiene ramas
+  optimizadas para el caso común (ángulos "limpios") que simplemente no existen en hardware fijo.
+
+**Consecuencia práctica (el punto para control/tiempo real):** en la FPGA, el peor caso de
+tiempo de ejecución **es** el caso típico — no hay sorpresas. En el STM32, el peor caso (un
+ángulo genérico) es estructuralmente más lento que el mejor caso (un ángulo en 0°/90°/180°), y esa
+diferencia (~32% aquí) hay que medirla empíricamente probando muchas combinaciones de entrada,
+porque no se puede leer del código fuente ni de la hoja de datos del chip — el software no tiene
+un "peor caso" fácil de acotar, el hardware dedicado sí.
 
 ---
 
@@ -359,17 +490,25 @@ ciclos de diferencia frente al Caso 1, que sí calcula las 3 (`yaw`, `pitch`, `r
 
 | | FPGA (50 MHz) | STM32 @ 216 MHz | STM32 @ 16 MHz |
 |---|---|---|---|
-| Tiempo (constante / según caso) | ~3.1 µs | 33.5–48.8 µs | 452–659 µs |
-| **Veces más lento que la FPGA** | 1× | **10.8×–15.7×** | **146×–212×** |
+| Tiempo | **~4.05 µs, siempre** (fijo, cualquier ángulo) | 37.5–51.4 µs (según el ángulo) | 505.3–688.9 µs (según el ángulo) |
+| **Veces más lento que la FPGA** | 1× | **~9.3×–12.7×** | **~124.8×–170.1×** |
 
 A pesar de que el STM32 a máxima velocidad tiene un reloj **4.3 veces más rápido** que la FPGA
-(216MHz vs 50MHz), termina el mismo cálculo entre **10.8 y 15.7 veces más lento** — el mismo
+(216MHz vs 50MHz), termina el mismo cálculo entre **~9.3 y 12.7 veces más lento** — el mismo
 patrón que ya se había visto con el brazo de 5R: hardware dedicado en pipeline (la FPGA calcula
 todo en paralelo, ciclo a ciclo, con circuitos construidos exactamente para esta cuenta) le gana
 por mucho a software secuencial (el STM32 ejecuta instrucción por instrucción, y cada
 `cos()`/`sin()`/`atan2()`/`sqrt()` de doble precisión cuesta decenas a cientos de ciclos), sin
 importar cuánto reloj se le meta al software. Y bajar la tarjeta a su velocidad de fábrica
-(16MHz, sin PLL) multiplica esa brecha por otras ~13.5×, hasta más de 200× frente a la FPGA.
+(16MHz, sin PLL) multiplica esa brecha por otras ~13.5×, hasta más de 170× frente a la FPGA.
+
+La FPGA subió de ~3.1 µs a ~4.05 µs (lección 12) y el STM32 también subió de tiempo respecto a
+la versión anterior (atajo + `DWT`) por el mismo motivo: el método recursivo hace más aritmética
+explícita en los dos lados (74 pasos vs 40 en VHDL; más operaciones de matriz en C) a cambio de
+ser el método que el profesor puede seguir — pagado en ambas plataformas, no solo una. Y como se
+explicó en la sección 9: en la FPGA ese tiempo **es el mismo sin importar el ángulo**; en el
+STM32 varía **hasta un 32%** según qué tan "limpio" sea el ángulo — la FPGA no solo gana en
+velocidad, gana en **previsibilidad**, una propiedad aparte y clave para control en tiempo real.
 
 ---
 
