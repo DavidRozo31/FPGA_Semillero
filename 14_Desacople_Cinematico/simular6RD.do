@@ -1,0 +1,70 @@
+quit -sim
+cd "C:/intelFPGA_lite/18.1/Projects/Desacople_Cinematico_6R"
+
+vlib work
+vmap work work
+
+vcom -93 ik_pkg.vhd
+vcom -93 cordic_pkg.vhd
+
+vcom -93 fp_adder.vhd
+vcom -93 fp_multiplier.vhd
+vcom -93 fp_divider.vhd
+vcom -93 sqrt_q13.vhd
+vcom -93 cordic_sincos_16.vhd
+vcom -93 cordic_atan2.vhd
+vcom -93 pulse_join2.vhd
+vcom -93 Angle_SinCos.vhd
+
+vcom -93 Cinematica_Inversa3R.vhd
+vcom -93 Mat3x3_Mult.vhd
+vcom -93 Mat3_Transpose.vhd
+vcom -93 Wrist_Center.vhd
+vcom -93 WristAngles3R.vhd
+vcom -93 R03_Builder.vhd
+
+vcom -93 Desacople6R_Top.vhd
+vcom -93 tb_Desacople6R_Top.vhd
+
+vsim work.tb_Desacople6R_Top
+
+add wave -divider Control
+add wave sim:/tb_Desacople6R_Top/clk
+add wave sim:/tb_Desacople6R_Top/reset
+add wave sim:/tb_Desacople6R_Top/Start
+add wave sim:/tb_Desacople6R_Top/Desacople_Listo
+
+add wave -divider Orientacion_Entrada
+add wave -radix decimal sim:/tb_Desacople6R_Top/R11_d
+add wave -radix decimal sim:/tb_Desacople6R_Top/R12_d
+add wave -radix decimal sim:/tb_Desacople6R_Top/R13_d
+add wave -radix decimal sim:/tb_Desacople6R_Top/R21_d
+add wave -radix decimal sim:/tb_Desacople6R_Top/R22_d
+add wave -radix decimal sim:/tb_Desacople6R_Top/R23_d
+add wave -radix decimal sim:/tb_Desacople6R_Top/R31_d
+add wave -radix decimal sim:/tb_Desacople6R_Top/R32_d
+add wave -radix decimal sim:/tb_Desacople6R_Top/R33_d
+
+add wave -divider Posicion_Entrada
+add wave -radix decimal sim:/tb_Desacople6R_Top/x_d
+add wave -radix decimal sim:/tb_Desacople6R_Top/y_d
+add wave -radix decimal sim:/tb_Desacople6R_Top/z_d
+
+add wave -divider Angulos_Articulares_Salida
+add wave -radix decimal sim:/tb_Desacople6R_Top/tetha1Final
+add wave -radix decimal sim:/tb_Desacople6R_Top/tetha2Final
+add wave -radix decimal sim:/tb_Desacople6R_Top/tetha3Final
+add wave -radix decimal sim:/tb_Desacople6R_Top/tetha4Final
+add wave -radix decimal sim:/tb_Desacople6R_Top/tetha5Final
+add wave -radix decimal sim:/tb_Desacople6R_Top/tetha6Final
+
+add wave -divider Internos_DUT
+add wave sim:/tb_Desacople6R_Top/DUT/*
+
+configure wave -namecolwidth 220
+configure wave -valuecolwidth 100
+configure wave -timelineunits ns
+
+run -all
+
+wave zoom full

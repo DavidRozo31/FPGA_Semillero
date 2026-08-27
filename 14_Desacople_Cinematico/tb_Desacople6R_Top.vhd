@@ -1,0 +1,208 @@
+LIBRARY ieee;
+USE ieee.std_logic_1164.ALL;
+USE ieee.numeric_std.ALL;
+USE ieee.math_real.ALL;
+
+ENTITY tb_Desacople6R_Top IS
+END tb_Desacople6R_Top;
+
+ARCHITECTURE sim OF tb_Desacople6R_Top IS
+
+    COMPONENT Desacople6R_Top
+        PORT
+        (
+            clk             : IN  STD_LOGIC;
+            reset           : IN  STD_LOGIC;
+            Start           : IN  STD_LOGIC;
+            R11_d           : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+            R12_d           : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+            R13_d           : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+            R21_d           : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+            R22_d           : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+            R23_d           : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+            R31_d           : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+            R32_d           : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+            R33_d           : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+            x_d             : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+            y_d             : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+            z_d             : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+            Desacople_Listo : OUT STD_LOGIC;
+            tetha1Final     : OUT STD_LOGIC_VECTOR(15 DOWNTO 0);
+            tetha2Final     : OUT STD_LOGIC_VECTOR(15 DOWNTO 0);
+            tetha3Final     : OUT STD_LOGIC_VECTOR(15 DOWNTO 0);
+            tetha4Final     : OUT STD_LOGIC_VECTOR(15 DOWNTO 0);
+            tetha5Final     : OUT STD_LOGIC_VECTOR(15 DOWNTO 0);
+            tetha6Final     : OUT STD_LOGIC_VECTOR(15 DOWNTO 0)
+        );
+    END COMPONENT;
+
+    CONSTANT CLK_PERIOD : time    := 20 ns;
+    CONSTANT Q_SCALE    : real    := 8192.0;
+    CONSTANT MAX_CYCLES : integer := 5000;
+
+    SIGNAL clk    : STD_LOGIC := '0';
+    SIGNAL reset  : STD_LOGIC := '1';
+    SIGNAL Start  : STD_LOGIC := '0';
+
+    SIGNAL R11_d, R12_d, R13_d : STD_LOGIC_VECTOR(15 DOWNTO 0) := (OTHERS => '0');
+    SIGNAL R21_d, R22_d, R23_d : STD_LOGIC_VECTOR(15 DOWNTO 0) := (OTHERS => '0');
+    SIGNAL R31_d, R32_d, R33_d : STD_LOGIC_VECTOR(15 DOWNTO 0) := (OTHERS => '0');
+    SIGNAL x_d, y_d, z_d       : STD_LOGIC_VECTOR(15 DOWNTO 0) := (OTHERS => '0');
+
+    SIGNAL Desacople_Listo : STD_LOGIC;
+    SIGNAL tetha1Final, tetha2Final, tetha3Final : STD_LOGIC_VECTOR(15 DOWNTO 0);
+    SIGNAL tetha4Final, tetha5Final, tetha6Final : STD_LOGIC_VECTOR(15 DOWNTO 0);
+
+    SIGNAL sim_done : BOOLEAN := false;
+
+    FUNCTION to_q213(val : real) RETURN STD_LOGIC_VECTOR IS
+    BEGIN
+        RETURN STD_LOGIC_VECTOR(TO_SIGNED(INTEGER(val * Q_SCALE), 16));
+    END FUNCTION;
+
+    FUNCTION to_real(val : STD_LOGIC_VECTOR(15 DOWNTO 0)) RETURN real IS
+    BEGIN
+        RETURN REAL(TO_INTEGER(SIGNED(val))) / Q_SCALE;
+    END FUNCTION;
+
+    FUNCTION rad_to_deg(val : real) RETURN real IS
+    BEGIN
+        RETURN val * 180.0 / MATH_PI;
+    END FUNCTION;
+
+BEGIN
+
+    DUT : Desacople6R_Top
+        PORT MAP
+        (
+            clk             => clk,
+            reset           => reset,
+            Start           => Start,
+            R11_d           => R11_d,
+            R12_d           => R12_d,
+            R13_d           => R13_d,
+            R21_d           => R21_d,
+            R22_d           => R22_d,
+            R23_d           => R23_d,
+            R31_d           => R31_d,
+            R32_d           => R32_d,
+            R33_d           => R33_d,
+            x_d             => x_d,
+            y_d             => y_d,
+            z_d             => z_d,
+            Desacople_Listo => Desacople_Listo,
+            tetha1Final     => tetha1Final,
+            tetha2Final     => tetha2Final,
+            tetha3Final     => tetha3Final,
+            tetha4Final     => tetha4Final,
+            tetha5Final     => tetha5Final,
+            tetha6Final     => tetha6Final
+        );
+
+    clk_process : PROCESS
+    BEGIN
+        WHILE NOT sim_done LOOP
+            clk <= '0';
+            WAIT FOR CLK_PERIOD / 2;
+            clk <= '1';
+            WAIT FOR CLK_PERIOD / 2;
+        END LOOP;
+        WAIT;
+    END PROCESS;
+
+    stimulus : PROCESS
+
+        PROCEDURE run_case
+        (
+            CONSTANT case_name : IN string;
+            CONSTANT rz         : IN real;
+            CONSTANT ry         : IN real;
+            CONSTANT rx         : IN real;
+            CONSTANT px         : IN real;
+            CONSTANT py         : IN real;
+            CONSTANT pz         : IN real
+        ) IS
+            VARIABLE cz, sz, cy, sy, cx, sx : real;
+            VARIABLE r11v, r12v, r13v : real;
+            VARIABLE r21v, r22v, r23v : real;
+            VARIABLE r31v, r32v, r33v : real;
+            VARIABLE cycle_count : integer;
+        BEGIN
+            cz := COS(rz);
+            sz := SIN(rz);
+            cy := COS(ry);
+            sy := SIN(ry);
+            cx := COS(rx);
+            sx := SIN(rx);
+
+            r11v := cz * cy;
+            r12v := cz * sy * sx - sz * cx;
+            r13v := cz * sy * cx + sz * sx;
+            r21v := sz * cy;
+            r22v := sz * sy * sx + cz * cx;
+            r23v := sz * sy * cx - cz * sx;
+            r31v := -sy;
+            r32v := cy * sx;
+            r33v := cy * cx;
+
+            R11_d <= to_q213(r11v);
+            R12_d <= to_q213(r12v);
+            R13_d <= to_q213(r13v);
+            R21_d <= to_q213(r21v);
+            R22_d <= to_q213(r22v);
+            R23_d <= to_q213(r23v);
+            R31_d <= to_q213(r31v);
+            R32_d <= to_q213(r32v);
+            R33_d <= to_q213(r33v);
+            x_d   <= to_q213(px);
+            y_d   <= to_q213(py);
+            z_d   <= to_q213(pz);
+
+            WAIT UNTIL rising_edge(clk);
+            Start <= '1';
+            WAIT UNTIL rising_edge(clk);
+            Start <= '0';
+
+            cycle_count := 0;
+            WHILE Desacople_Listo = '0' AND cycle_count < MAX_CYCLES LOOP
+                WAIT UNTIL rising_edge(clk);
+                cycle_count := cycle_count + 1;
+            END LOOP;
+
+            IF Desacople_Listo = '0' THEN
+                REPORT case_name & " : TIMEOUT, Desacople_Listo never went high" SEVERITY error;
+            ELSE
+                REPORT "----- " & case_name & " -----";
+                REPORT "theta1 = " & real'image(rad_to_deg(to_real(tetha1Final))) & " deg";
+                REPORT "theta2 = " & real'image(rad_to_deg(to_real(tetha2Final))) & " deg";
+                REPORT "theta3 = " & real'image(rad_to_deg(to_real(tetha3Final))) & " deg";
+                REPORT "theta4 = " & real'image(rad_to_deg(to_real(tetha4Final))) & " deg";
+                REPORT "theta5 = " & real'image(rad_to_deg(to_real(tetha5Final))) & " deg";
+                REPORT "theta6 = " & real'image(rad_to_deg(to_real(tetha6Final))) & " deg";
+            END IF;
+
+            WAIT FOR CLK_PERIOD * 4;
+        END PROCEDURE;
+
+    BEGIN
+        reset <= '1';
+        Start <= '0';
+        WAIT FOR CLK_PERIOD * 5;
+        reset <= '0';
+        WAIT FOR CLK_PERIOD * 2;
+
+        run_case("Caso 1 - Orientacion identidad", 0.0, 0.0, 0.0, 0.30, 0.00, 0.45);
+        run_case("Caso 2 - Rotacion 90 deg en Z", MATH_PI / 2.0, 0.0, 0.0, 0.20, 0.25, 0.35);
+        run_case("Caso 3 - Rotacion ZYX combinada", MATH_PI / 6.0, MATH_PI / 4.0, MATH_PI / 8.0, 0.15, 0.10, 0.40);
+        run_case("Caso MATLAB Original", 
+                 -128.2 * MATH_PI / 180.0, 
+                 -11.5  * MATH_PI / 180.0, 
+                  26.1  * MATH_PI / 180.0, 
+                 0.08790, 0.18655, 0.38781);
+
+        REPORT "Todos los casos de prueba finalizaron";
+        sim_done <= true;
+        WAIT;
+    END PROCESS;
+
+END sim;

@@ -1,0 +1,104 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+entity tb_Cinematica_Inversa3R is
+end tb_Cinematica_Inversa3R;
+
+architecture sim of tb_Cinematica_Inversa3R is
+
+    component Cinematica_Inversa3R
+        PORT (
+            clk         : IN  STD_LOGIC;
+            reset       : IN  STD_LOGIC;
+            Start       : IN  STD_LOGIC;
+            Px_d        : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+            Py_d        : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+            Pz_d        : IN  STD_LOGIC_VECTOR(15 DOWNTO 0);
+            Ik3R_Ready  : OUT STD_LOGIC;
+            tetha_one   : OUT STD_LOGIC_VECTOR(15 DOWNTO 0);
+            tetha_three : OUT STD_LOGIC_VECTOR(15 DOWNTO 0);
+            tetha_two   : OUT STD_LOGIC_VECTOR(15 DOWNTO 0)
+        );
+    end component;
+
+    signal clk_tb    : std_logic := '0';
+    signal reset_tb  : std_logic := '1';
+    signal start_tb  : std_logic := '0';
+    signal px_tb     : std_logic_vector(15 downto 0) := (others => '0');
+    signal py_tb     : std_logic_vector(15 downto 0) := (others => '0');
+    signal pz_tb     : std_logic_vector(15 downto 0) := (others => '0');
+    signal ready_tb  : std_logic;
+    signal theta1_tb : std_logic_vector(15 downto 0);
+    signal theta2_tb : std_logic_vector(15 downto 0);
+    signal theta3_tb : std_logic_vector(15 downto 0);
+
+    constant CLK_PERIOD : time := 20 ns;
+
+    -- Caso de prueba 1: PosWrist = (0.100, 0.050, 0.150) m, en Q2.13 (x8192)
+    constant TEST1_PX : std_logic_vector(15 downto 0) := x"0333"; -- 0.100 m
+    constant TEST1_PY : std_logic_vector(15 downto 0) := x"019A"; -- 0.050 m
+    constant TEST1_PZ : std_logic_vector(15 downto 0) := x"04CD"; -- 0.150 m
+
+begin
+
+    DUT : Cinematica_Inversa3R
+        PORT MAP (
+            clk         => clk_tb,
+            reset       => reset_tb,
+            Start       => start_tb,
+            Px_d        => px_tb,
+            Py_d        => py_tb,
+            Pz_d        => pz_tb,
+            Ik3R_Ready  => ready_tb,
+            tetha_one   => theta1_tb,
+            tetha_three => theta3_tb,
+            tetha_two   => theta2_tb
+        );
+
+    -- Generacion de reloj
+    CLK_GEN : process
+    begin
+        clk_tb <= '0';
+        wait for CLK_PERIOD / 2;
+        clk_tb <= '1';
+        wait for CLK_PERIOD / 2;
+    end process;
+
+    -- Estimulos
+    STIM : process
+    begin
+        -- Reset inicial
+        reset_tb <= '1';
+        start_tb <= '0';
+        px_tb <= (others => '0');
+        py_tb <= (others => '0');
+        pz_tb <= (others => '0');
+        wait for CLK_PERIOD * 5;
+
+        reset_tb <= '0';
+        wait for CLK_PERIOD * 2;
+
+        -- Caso de prueba 1
+        px_tb <= TEST1_PX;
+        py_tb <= TEST1_PY;
+        pz_tb <= TEST1_PZ;
+        wait until rising_edge(clk_tb);
+        start_tb <= '1';
+        wait until rising_edge(clk_tb);
+        start_tb <= '0';
+
+        wait until ready_tb = '1';
+        wait for CLK_PERIOD * 2;
+
+        report "Caso 1 completado" severity note;
+        report "theta1 (raw) = " & integer'image(to_integer(signed(theta1_tb))) severity note;
+        report "theta2 (raw) = " & integer'image(to_integer(signed(theta2_tb))) severity note;
+        report "theta3 (raw) = " & integer'image(to_integer(signed(theta3_tb))) severity note;
+
+        wait for CLK_PERIOD * 10;
+        report "Fin de la simulacion" severity note;
+        wait;
+    end process;
+
+end sim;

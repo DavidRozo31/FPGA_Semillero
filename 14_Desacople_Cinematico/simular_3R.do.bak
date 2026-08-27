@@ -1,0 +1,70 @@
+quit -sim
+cd "C:/intelFPGA_lite/18.1/Projects/2R_PruebaReal"
+if {[file exists work]} { vdel -lib work -all }
+vlib work
+vmap work work
+vcom -93   -work work fp_multiplier.vhd
+vcom -93   -work work fp_adder.vhd
+vcom -93   -work work fp_divider.vhd
+vcom -93   -work work sqrt_q13.vhd
+vcom -93   -work work cordic_pkg.vhd
+vcom -93   -work work ik_pkg.vhd
+vcom -93   -work work cordic_atan2.vhd
+vcom -93   -work work pulse_join2.vhd
+vcom -93   -work work Block2RTest.vhd
+vcom -2008 -work work uart_rx.vhd
+vcom -93   -work work uart_transmitter.vhd
+vcom -93   -work work uart_ik_decoder.vhd
+vcom -93   -work work PWM_50Hz.vhd
+vcom -93   -work work ik_pwm_encoder.vhd
+vcom -93   -work work uart_tx_sequencer.vhd
+vcom -93   -work work done_latch_reg.vhd
+vcom -93   -work work robot_2R_top.vhd
+vcom -93   -work work tb_robot_2R_top.vhd
+vsim -t ns -voptargs=+acc work.tb_robot_2R_top
+add wave -divider "RELOJ Y RESET"
+add wave -color white      -label "clk"                sim:/tb_robot_2R_top/clk
+add wave -color red        -label "rst activo BAJO"    sim:/tb_robot_2R_top/rst
+add wave -color orange     -label "rst_int activo ALTO" sim:/tb_robot_2R_top/DUT/rst_int
+add wave -divider "ENTRADA UART RX"
+add wave -color cyan       -label "Data rx"            sim:/tb_robot_2R_top/Data
+add wave -color yellow     -label "data_rdy"           sim:/tb_robot_2R_top/DUT/SYNTHESIZED_WIRE_3
+add wave -color yellow     -label "data_out"           -radix decimal sim:/tb_robot_2R_top/DUT/SYNTHESIZED_WIRE_4
+add wave -divider "UART IK DECODER"
+add wave -color orange     -label "Start IK"           sim:/tb_robot_2R_top/DUT/SYNTHESIZED_WIRE_25
+add wave -color orange     -label "Px out"             -radix decimal sim:/tb_robot_2R_top/DUT/SYNTHESIZED_WIRE_1
+add wave -color orange     -label "Py out"             -radix decimal sim:/tb_robot_2R_top/DUT/SYNTHESIZED_WIRE_2
+add wave -divider "IK 2R Block2RTest"
+add wave -color magenta    -label "Done_2Ri"           sim:/tb_robot_2R_top/DUT/SYNTHESIZED_WIRE_8
+add wave -color magenta    -label "tetha1"             -radix decimal sim:/tb_robot_2R_top/DUT/SYNTHESIZED_WIRE_27
+add wave -color magenta    -label "thetha2"            -radix decimal sim:/tb_robot_2R_top/DUT/SYNTHESIZED_WIRE_28
+add wave -divider "Block2RTest internas Join"
+add wave -color "#FFCC00"  -label "done theta2 cordic"  sim:/tb_robot_2R_top/DUT/b2v_inst/SYNTHESIZED_WIRE_32
+add wave -color "#FF9900"  -label "valid theta1 adder"  sim:/tb_robot_2R_top/DUT/b2v_inst/SYNTHESIZED_WIRE_33
+add wave -color "#00FFCC"  -label "start rama theta1"   sim:/tb_robot_2R_top/DUT/b2v_inst/SYNTHESIZED_WIRE_74
+add wave -color "#00CCFF"  -label "valid47 fp_adder"    sim:/tb_robot_2R_top/DUT/b2v_inst/SYNTHESIZED_WIRE_47
+add wave -color "#66FF66"  -label "valid48 fp_mult"     sim:/tb_robot_2R_top/DUT/b2v_inst/SYNTHESIZED_WIRE_48
+add wave -divider "DONE LATCH REG"
+add wave -color "#FF88FF"  -label "done_ik entrada"    sim:/tb_robot_2R_top/DUT/SYNTHESIZED_WIRE_8
+add wave -color "#FF00FF"  -label "done_latch salida"  sim:/tb_robot_2R_top/DUT/SYNTHESIZED_WIRE_26
+add wave -divider "Encoder theta1 Servo1"
+add wave -color green      -label "valid_o enc1"       sim:/tb_robot_2R_top/DUT/SYNTHESIZED_WIRE_23
+add wave -color green      -label "dutycycle1"         -radix decimal sim:/tb_robot_2R_top/DUT/SYNTHESIZED_WIRE_30
+add wave -color lime       -label "Servo1 PWM"         sim:/tb_robot_2R_top/Servo1
+add wave -divider "Encoder theta2 Servo2"
+add wave -color blue       -label "valid_o enc2"       sim:/tb_robot_2R_top/DUT/SYNTHESIZED_WIRE_24
+add wave -color blue       -label "dutycycle2"         -radix decimal sim:/tb_robot_2R_top/DUT/SYNTHESIZED_WIRE_31
+add wave -color dodgerblue -label "Servo2 PWM"         sim:/tb_robot_2R_top/Servo2
+add wave -divider "PWM Enable"
+add wave -color white      -label "PWM start AND"      sim:/tb_robot_2R_top/DUT/SYNTHESIZED_WIRE_29
+add wave -divider "UART TX retorno PC"
+add wave -color cyan       -label "TX_DATA_SIG"        -radix hexadecimal sim:/tb_robot_2R_top/DUT/SYNTHESIZED_WIRE_6
+add wave -color cyan       -label "TX_STRT_SIG"        sim:/tb_robot_2R_top/DUT/SYNTHESIZED_WIRE_5
+add wave -color cyan       -label "TX_FLAG_SIG"        sim:/tb_robot_2R_top/DUT/SYNTHESIZED_WIRE_18
+add wave -color white      -label "TX pin salida"      sim:/tb_robot_2R_top/TX
+configure wave -namecolwidth  220
+configure wave -valuecolwidth 120
+configure wave -justifyvalue  left
+configure wave -signalnamewidth 1
+run 35 ms
+wave zoom full

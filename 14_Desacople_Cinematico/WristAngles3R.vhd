@@ -1,0 +1,67 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+
+entity WristAngles3R is
+    Port (
+        clk, rst, start : in  STD_LOGIC;
+        r13, r23, r31, r32, r33 : in  STD_LOGIC_VECTOR(15 downto 0);
+        done : out STD_LOGIC;
+        theta4, theta5, theta6 : out STD_LOGIC_VECTOR(15 downto 0)
+    );
+end WristAngles3R;
+
+architecture struct of WristAngles3R is
+    component fp_multiplier
+        Port(clk,rst,valid_i: in STD_LOGIC; a_in,b_in: in STD_LOGIC_VECTOR(15 downto 0);
+             valid_o: out STD_LOGIC; p_out: out STD_LOGIC_VECTOR(15 downto 0));
+    end component;
+    component fp_adder
+        Port(clk,rst,op,valid_i: in STD_LOGIC; a_in,b_in: in STD_LOGIC_VECTOR(15 downto 0);
+             valid_o: out STD_LOGIC; p_out: out STD_LOGIC_VECTOR(15 downto 0));
+    end component;
+    component sqrt_q13
+        Port(clk,rst,start: in STD_LOGIC; x_in: in STD_LOGIC_VECTOR(15 downto 0);
+             done: out STD_LOGIC; y_out: out STD_LOGIC_VECTOR(15 downto 0));
+    end component;
+    component cordic_atan2
+        Port(clk,rst,start: in STD_LOGIC; x_in,y_in: in STD_LOGIC_VECTOR(15 downto 0);
+             done: out STD_LOGIC; angle: out STD_LOGIC_VECTOR(15 downto 0));
+    end component;
+    component pulse_join2
+        Port(clk,rst,pulse_a,pulse_b: in STD_LOGIC; joined: out STD_LOGIC);
+    end component;
+
+    signal neg_r23, neg_r31 : STD_LOGIC_VECTOR(15 downto 0);
+    signal d_neg23, d_neg31 : STD_LOGIC;
+    signal d_theta4, d_theta6 : STD_LOGIC;
+
+    signal r33sq, sinarg, sin5 : STD_LOGIC_VECTOR(15 downto 0);
+    signal d_r33sq, d_sinarg, d_sin5, d_theta5 : STD_LOGIC;
+
+    signal join46, done_i : STD_LOGIC;
+	 signal one, zero : STD_LOGIC_VECTOR(15 downto 0);
+begin
+    one  <= x"2000";
+    zero <= x"0000";
+	 
+    -- theta4 = atan2(r13, -r23)
+    NEG23: fp_adder port map(clk,rst,'1',start,zero,r23,d_neg23,neg_r23); -- 0 - r23
+    T4: cordic_atan2 port map(clk,rst,d_neg23,neg_r23,r13,d_theta4,theta4);
+
+    -- theta6 = atan2(r32, -r31)
+    NEG31: fp_adder port map(clk,rst,'1',start,zero,r31,d_neg31,neg_r31); -- 0 - r31
+    T6: cordic_atan2 port map(clk,rst,d_neg31,neg_r31,r32,d_theta6,theta6);
+
+    -- theta5 = atan2( sqrt(1-r33^2), r33 )
+    MULT_R33SQ: fp_multiplier port map(clk,rst,start,r33,r33,d_r33sq,r33sq);
+    SINARG_C: fp_adder port map(clk,rst,'1',d_r33sq,one,r33sq,d_sinarg,sinarg); -- 1 - r33^2
+    SQRT5: sqrt_q13 port map(clk,rst,d_sinarg,sinarg,d_sin5,sin5);
+    T5: cordic_atan2 port map(clk,rst,d_sin5,r33,sin5,d_theta5,theta5);
+
+    -- theta4 y theta6 tienen la misma profundidad (negacion+atan2) -> AND directo seguro
+    join46 <= d_theta4 and d_theta6;
+    -- theta5 es una rama mas larga (mult+resta+raiz+atan2) -> necesita el join real
+    JOIN_FINAL: pulse_join2 port map(clk,rst,join46,d_theta5,done_i);
+    done <= done_i;
+
+end struct;
