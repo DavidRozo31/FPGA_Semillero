@@ -1,0 +1,48 @@
+=== Cinematica Directa 6 GDL real -- STM32F767ZI @ 16MHz (HSI, sin PLL, TIM5) ===
+Presiona el boton de usuario (B1) para repetir las 3 pruebas.
+
+=== Caso 1 [extendido] q=0 ===
+  entradas (grados): th1=0.0 th2=0.0 th3=0.0 th4=0.0 th5=0.0 th6=0.0
+  x=0.4200 m  y=-0.0000 m  z=0.0650 m
+  yaw=-90.00 deg  pitch=-0.00 deg  roll=-90.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 8722  (545.125 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 8317  (519.812 us)
+
+=== Caso 2 [SINGULARIDAD del 6R] th5=90 th6=90 ===
+  entradas (grados): th1=0.0 th2=0.0 th3=0.0 th4=0.0 th5=90.0 th6=90.0
+  x=0.2470 m  y=0.1730 m  z=0.0650 m
+  yaw=0.00 deg  pitch=90.00 deg  roll=180.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 8083  (505.188 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 8071  (504.438 us)
+
+=== Caso 3 [generico] ===
+  entradas (grados): th1=30.0 th2=20.0 th3=-15.0 th4=45.0 th5=60.0 th6=-70.0
+  x=0.2215 m  y=0.2502 m  z=0.2269 m
+  yaw=-42.50 deg  pitch=-34.56 deg  roll=-37.47 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 11007  (687.938 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 10992  (687.000 us)
+
+=== Caso EXTRA-1 [MEJOR CASO: los 6 angulos en 90 grados] ===
+  entradas (grados): th1=90.0 th2=90.0 th3=90.0 th4=90.0 th5=90.0 th6=90.0
+  x=-0.0000 m  y=-0.1400 m  z=-0.0010 m
+  yaw=180.00 deg  pitch=-0.00 deg  roll=-180.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 9157  (572.312 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 9147  (571.688 us)
+
+=== Caso EXTRA-2 [PEOR CASO: angulos irregulares, dentro de 0-180] ===
+  entradas (grados): th1=137.6 th2=23.9 th3=168.2 th4=74.5 th5=109.3 th6=41.7
+  x=-0.0662 m  y=0.0014 m  z=-0.0629 m
+  yaw=-88.66 deg  pitch=11.91 deg  roll=146.93 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 11206  (700.375 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 11239  (702.438 us)
+
+=== Caso EXTRA-3 [CANDIDATO MEJOR CASO TEORICO: singularidad + min. angulos] ===
+  entradas (grados): th1=0.0 th2=0.0 th3=-90.0 th4=-90.0 th5=90.0 th6=0.0
+  x=-0.0660 m  y=-0.0000 m  z=-0.0750 m
+  yaw=0.00 deg  pitch=90.00 deg  roll=180.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 7553  (472.062 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 7542  (471.375 us)
+
+(Corrida repetida varias veces presionando B1 -- los 6 casos dieron numeros
+identicos entre corridas, confirmando estabilidad. Con esto quedan los 6
+casos completos en las dos velocidades -- ver README seccion 10.)

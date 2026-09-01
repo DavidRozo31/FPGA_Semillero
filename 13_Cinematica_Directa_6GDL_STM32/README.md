@@ -31,6 +31,13 @@ preguntas distintas:
 > que fuerzan al máximo la reducción de rango de `cos()/sin()`). Ver sección 8 (log actualizado),
 > sección 9 (hallazgo 4) y la nueva sección 10 con el mínimo y máximo confirmados por reloj.
 
+> **Cuarta actualización — el mínimo y máximo ya quedaron 100% confirmados en las dos
+> velocidades.** El "mejor caso" pedido por los profes (EXTRA-1, todo en 90°) no resultó ser el
+> más rápido: se investigó por qué (Hallazgo 4) y de ahí salió un tercer caso, EXTRA-3, encontrado
+> por álgebra simbólica y verificado en la tarjeta real como el nuevo mínimo — 6.6% más rápido que
+> el candidato anterior, en **las dos** velocidades. Con los 6 casos ya corridos completos a
+> 216MHz y a 16MHz, las secciones 9, 10 y 11 quedan cerradas sin datos pendientes.
+
 > **Plataforma:** STM32F767ZI en Nucleo-144 (Cortex-M7, FPU doble precisión) · Keil µVision5
 > **Estilo:** 100% a registro (`RCC->...`, `GPIOD->...`), sin HAL ni LL — mismo estilo que el
 > resto de proyectos STM32 del semillero.
@@ -370,14 +377,17 @@ el mismo que pidió el profesor para el ejemplo de I2C con TIM5):
 ## 8. La salida real del UART
 
 Log completo capturado por HTerm, en las dos velocidades, con el botón de usuario presionado
-varias veces para confirmar que los resultados son estables entre corridas — archivo completo en
-[`output_2026-08-19_STM32_6GDL_TIM5_posicion_recursiva.log`](output_2026-08-19_STM32_6GDL_TIM5_posicion_recursiva.log)
-(3 casos originales), con los dos casos EXTRA agregados después en
+varias veces para confirmar que los resultados son estables entre corridas. Evolución de las
+capturas: 3 casos originales en
+[`output_2026-08-19_STM32_6GDL_TIM5_posicion_recursiva.log`](output_2026-08-19_STM32_6GDL_TIM5_posicion_recursiva.log),
+los 2 casos EXTRA agregados en
 [`output_2026-09-01_STM32_6GDL_TIM5_mejor_peor_caso.log`](output_2026-09-01_STM32_6GDL_TIM5_mejor_peor_caso.log),
-y con el Caso EXTRA-3 confirmado a 216MHz en
-[`output_2026-09-01_STM32_6GDL_216MHz_EXTRA3_confirmado.log`](output_2026-09-01_STM32_6GDL_216MHz_EXTRA3_confirmado.log)
-(3 corridas seguidas, resultado idéntico — a 16MHz el EXTRA-3 todavía está pendiente de correr).
-Extracto (una corrida de cada velocidad; a 16MHz todavía son 5 casos, el EXTRA-3 falta):
+el Caso EXTRA-3 confirmado primero a 216MHz en
+[`output_2026-09-01_STM32_6GDL_216MHz_EXTRA3_confirmado.log`](output_2026-09-01_STM32_6GDL_216MHz_EXTRA3_confirmado.log),
+y los 6 casos completos en las dos velocidades (incluyendo el EXTRA-2 a 16MHz que había quedado
+con la captura cortada) en
+[`output_2026-09-01_STM32_6GDL_16MHz_completo.log`](output_2026-09-01_STM32_6GDL_16MHz_completo.log).
+Extracto (una corrida de cada velocidad, los 6 casos completos en las dos):
 
 ```
 === Cinematica Directa 6 GDL real -- STM32F767ZI @ 216MHz (TIM5) ===
@@ -457,17 +467,23 @@ Extracto (una corrida de cada velocidad; a 16MHz todavía son 5 casos, el EXTRA-
 
 === Caso EXTRA-2 [PEOR CASO: angulos irregulares, dentro de 0-180] ===
   entradas (grados): th1=137.6 th2=23.9 th3=168.2 th4=74.5 th5=109.3 th6=41.7
-  [CAPTURA INCOMPLETA -- pendiente repetir esta corrida puntual para
-   confirmar roll y los ticks TIM5 de este ultimo caso a 16MHz]
+  x=-0.0662 m  y=0.0014 m  z=-0.0629 m
+  yaw=-88.66 deg  pitch=11.91 deg  roll=146.93 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 11206  (700.375 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 11239  (702.438 us)
+
+=== Caso EXTRA-3 [CANDIDATO MEJOR CASO TEORICO: singularidad + min. angulos] ===
+  entradas (grados): th1=0.0 th2=0.0 th3=-90.0 th4=-90.0 th5=90.0 th6=0.0
+  x=-0.0660 m  y=-0.0000 m  z=-0.0750 m
+  yaw=0.00 deg  pitch=90.00 deg  roll=180.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 7553  (472.062 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 7542  (471.375 us)
 ```
 
 Posición y orientación coincidieron **exactas** con lo esperado (misma verificación que la
 [tabla de la lección 12, sección 7](../12_Cinematica_Directa_6GDL/README.md#7-verificación-modelsim-y-matlab)),
-en las dos velocidades, en varias corridas repetidas — confirma que el puerto a C del método
-recursivo está bien hecho, independiente del reloj. La única excepción es el dato de tiempo del
-Caso EXTRA-2 a 16MHz, cuya captura por terminal se cortó a la mitad (ver sección 10) — no afecta
-la validación de posición/orientación, que ya estaba confirmada en los otros 4 casos y en la
-corrida a 216MHz.
+en las dos velocidades y en los 6 casos, en varias corridas repetidas — confirma que el puerto a
+C del método recursivo está bien hecho, independiente del reloj y del caso de prueba.
 
 ---
 
@@ -488,6 +504,13 @@ núcleo, así que ahí los ticks *son* ciclos directamente; a 216MHz, ciclos = t
 15–28 ciclos, <0.3%). Tiene sentido: el mismo código ejecuta el mismo número de instrucciones sin
 importar qué tan rápido tiquetee el reloj — lo que cambia es cuánto dura cada ciclo, por eso el
 tiempo real sí escala ~13.5× entre las dos tarjetas (justo la relación 216/16).
+
+**Confirmado con los 6 casos completos (sección 10):** el ratio tiempo(16MHz)/tiempo(216MHz),
+caso por caso, da **13.4985, 13.4985, 13.5000, 13.4985, 13.4988, 13.4999** — para Caso1, Caso2,
+Caso3, Extra1, Extra2 y Extra3 respectivamente. Con solo 3 casos ya se veía el patrón; con 6,
+incluyendo los dos extremos de tiempo (Extra3 el más rápido, Extra2 el más lento), la variación
+entre casos es de **0.0015**, prácticamente cero — el escalado por reloj es tan limpio como puede
+serlo en un sistema real con caché y wait-states de Flash de por medio.
 
 **Hallazgo 2 — la primera ejecución paga un costo de caché que es mayor a 216MHz, pero no es
 exclusivo de esa velocidad.** Caso 1 "en frío" tarda más ciclos que el promedio en **ambos**
@@ -541,9 +564,9 @@ en los dos relojes:
 
 | Caso | 216MHz, promedio (µs) | 16MHz, promedio (µs) |
 |---|---|---|
-| 2 — singularidad | **37.417** (el más rápido) | **505.500** (el más rápido) |
-| EXTRA-1 — los 6 ángulos en 90° | 42.407 | 572.938 |
-| EXTRA-2 — irregular (peor caso) | **52.083** (el más lento) | ≥688.000 (ver sección 10) |
+| 2 — singularidad | 37.370 | 504.438 |
+| EXTRA-1 — los 6 ángulos en 90° | 42.352 | 571.688 |
+| EXTRA-2 — irregular (peor caso) | **52.037** (el más lento de los 6) | **702.438** (el más lento de los 6) |
 
 El Caso EXTRA-1 sí es más rápido que el Caso 3 (genérico) y que el EXTRA-2, confirmando la
 hipótesis del Hallazgo 3 (ángulos "limpios" toman la ruta corta de `cos()`/`sin()`). Pero el Caso
@@ -556,76 +579,61 @@ sin llamar `atan2()` ni una sola vez — mientras que el Caso EXTRA-1, aunque ti
 más que tomar la ruta rápida dentro de esas llamadas — una distinción que no era obvia antes de
 medir con un caso diseñado específicamente para aislarla.
 
-**Confirmación — los dos efectos se suman (Caso EXTRA-3).** Si ahorrarse `atan2()` y evaluar
-ángulos baratos son dos efectos independientes, debería existir una configuración que combine
-los dos y le gane al Caso 2. Usando álgebra simbólica (`sympy`) sobre las mismas matrices
-`R1..R6` de la sección 3, se encontró `theta1=0, theta2=0, theta3=-90°, theta4=-90°, theta5=90°,
-theta6=0°` — los `-90°` en `theta3`/`theta4` cancelan el offset `+90°` que trae `dh_rot()` para
-esas dos articulaciones, dejando 5 de los 6 ángulos evaluados en 0° exacto (contra los 2 del
-Caso 2) mientras la combinación **sigue cayendo exactamente en la misma singularidad**
-(`mag=0.0`, verificado simbólicamente antes de tocar el firmware). Medido en la tarjeta real a
-216MHz: **34.917 µs promedio, contra 37.370 µs del Caso 2 en la misma corrida — 7.0% más
-rápido**, confirmado en 3 corridas consecutivas idénticas. Los dos efectos sí se suman: no es
-que uno "contenga" al otro, son dos optimizaciones independientes (una de control de flujo, otra
-de costo aritmético) que se pueden apilar.
+**Confirmación — los dos efectos se suman (Caso EXTRA-3), en las dos velocidades por igual.** Si
+ahorrarse `atan2()` y evaluar ángulos baratos son dos efectos independientes, debería existir una
+configuración que combine los dos y le gane al Caso 2. Usando álgebra simbólica (`sympy`) sobre
+las mismas matrices `R1..R6` de la sección 3, se encontró `theta1=0, theta2=0, theta3=-90°,
+theta4=-90°, theta5=90°, theta6=0°` — los `-90°` en `theta3`/`theta4` cancelan el offset `+90°`
+que trae `dh_rot()` para esas dos articulaciones, dejando 5 de los 6 ángulos evaluados en 0°
+exacto (contra los 2 del Caso 2) mientras la combinación **sigue cayendo exactamente en la misma
+singularidad** (`mag=0.0`, verificado simbólicamente antes de tocar el firmware). Medido en la
+tarjeta real:
+
+| Reloj | Caso 2 (µs) | Caso EXTRA-3 (µs) | EXTRA-3 más rápido por |
+|---|---|---|---|
+| 216 MHz | 37.370 | **34.917** | **6.56%** |
+| 16 MHz | 504.438 | **471.375** | **6.55%** |
+
+La mejora es **prácticamente idéntica en las dos velocidades** (6.56% y 6.55%) — otra confirmación
+de que es un efecto en *instrucciones*, no en tiempo de reloj (mismo patrón que el Hallazgo 1 y el
+Hallazgo 3). Los dos efectos sí se suman: no es que uno "contenga" al otro, son dos optimizaciones
+independientes (una de control de flujo, otra de costo aritmético) que se pueden apilar.
 
 ---
 
 ## 10. Mínimo y máximo medido, por reloj
 
-Con los 6 casos de prueba corridos a 216MHz (los 3 originales de la lección 12 más los 3 casos
-EXTRA de la sección 9 — dos pedidos explícitamente para acotar el rango real de tiempo dentro del
-espacio de ángulos físicamente alcanzable por el brazo, 0°-180°, y un tercero, EXTRA-3, agregado
-después como candidato a mejor caso teórico y ya confirmado en hardware), estos son los extremos
-medidos — `forward_kinematics()`, promedio de 1000 ejecuciones (estado estable, ver sección 7):
+Con los 6 casos de prueba corridos completos en las dos velocidades (los 3 originales de la
+lección 12 más los 3 casos EXTRA de la sección 9 — dos pedidos explícitamente por los profesores
+para acotar el rango real de tiempo dentro del espacio de ángulos físicamente alcanzable por el
+brazo, 0°-180°, y un tercero, EXTRA-3, encontrado por álgebra simbólica como candidato a mejor
+caso teórico y ya confirmado en hardware en las dos velocidades), estos son los extremos medidos
+— `forward_kinematics()`, promedio de 1000 ejecuciones (estado estable, ver sección 7):
 
 | Reloj | Mínimo | Configuración | Máximo | Configuración |
 |---|---|---|---|---|
 | **216 MHz** (PLL, Over-drive) | **34.917 µs** | Caso EXTRA-3 — singularidad + ángulos mínimos (ver Hallazgo 4) | **52.037 µs** | Caso EXTRA-2 — peor caso (ángulos irregulares, ver sección 9) |
-| **16 MHz** (HSI, sin PLL) | **505.500 µs** confirmado (Caso 2 — EXTRA-3 aún no corrido a 16MHz) | Caso 2 — singularidad (th5=90°, th6=90°, resto 0°) | **688.000 µs** confirmado (Caso 3 — genérico) | ver nota — EXTRA-2 sigue incompleto a 16MHz |
+| **16 MHz** (HSI, sin PLL) | **471.375 µs** | Caso EXTRA-3 — misma configuración | **702.438 µs** | Caso EXTRA-2 — misma configuración |
 
-> **Nota sobre el máximo a 16MHz:** el Caso EXTRA-2 (diseñado como el peor caso) fue efectivamente
-> el más lento a 216MHz (52.083 µs, un 2.3% más que el Caso 3), así que por el mismo patrón
-> probablemente también sea el máximo real a 16MHz — pero su captura por terminal a 16MHz se
-> cortó antes de leer el dato completo de tiempo (ver sección 8). Usando el factor de escalado
-> 13.5× confirmado en los otros 4 casos (sección 9, Hallazgo 1), el valor esperado ronda
-> **~702-705 µs** — esto es una **predicción, no una medición**, y se deja así de explícito hasta
-> repetir esa corrida puntual. El máximo **confirmado por medición completa** a 16MHz es el
-> Caso 3, con 688.000 µs.
-
-> **Caso EXTRA-3 — CONFIRMADO como el nuevo mínimo a 216MHz (predicción verificada en hardware
-> real):** el Caso 2 gana por evitar los 2 `atan2()` de la rama de singularidad (Hallazgo 4), pero
-> sigue evaluando 4 de sus 6 ángulos efectivos en 90° (`theta3+90°` y `theta4+90°` valen 90°
-> cuando `theta3=theta4=0`, por el offset de la tabla DH). Se buscó, verificando con álgebra
-> simbólica (`sympy`, no a mano) sobre las mismas matrices `R1..R6` de la sección 3, una
-> combinación que **siga cayendo exactamente en la misma rama de singularidad** (`mag=0`) pero
-> con menos ángulos "caros": `theta1=0, theta2=0, theta3=-90°, theta4=-90°, theta5=90°,
-> theta6=0°`. Los `-90°` en `theta3`/`theta4` cancelan el offset `+90°` de `dh_rot()`, dejando
-> **5 de los 6 ángulos evaluados en 0° exacto** y solo uno en 90° (`theta5`, intrínseco a esta
-> singularidad de muñeca). Corrido en la tarjeta real (216MHz, TIM5, 3 veces consecutivas,
-> resultado idéntico): **34.917 µs promedio — un 7.0% más rápido que el Caso 2** (37.370 µs en
-> esta misma corrida). Confirma que ambos efectos (saltarse `atan2()` + minimizar ángulos "caros")
-> se suman en vez de ser el mismo efecto medido dos veces. Ver sección 9 (Hallazgo 4, ampliado) y
-> sección 10 (nueva tabla de mínimo/máximo) — log completo en
-> [`output_2026-09-01_STM32_6GDL_216MHz_EXTRA3_confirmado.log`](output_2026-09-01_STM32_6GDL_216MHz_EXTRA3_confirmado.log).
-> **Pendiente:** correr el Caso EXTRA-3 a 16MHz (solo se confirmó a 216MHz hasta ahora) y repetir
-> el Caso EXTRA-2 a 16MHz (su captura sigue incompleta, ver nota de arriba). **Nota:**
-> `theta3`/`theta4` negativos quedan fuera del rango físico real de un servomotor (0°-180°) — es
-> un caso puramente de benchmark de software, no una pose que se le vaya a pedir al brazo real.
+Los 6 casos, log completo, en las dos velocidades:
+[`output_2026-09-01_STM32_6GDL_16MHz_completo.log`](output_2026-09-01_STM32_6GDL_16MHz_completo.log)
+(16MHz) y
+[`output_2026-09-01_STM32_6GDL_216MHz_EXTRA3_confirmado.log`](output_2026-09-01_STM32_6GDL_216MHz_EXTRA3_confirmado.log)
+(216MHz). El caso mínimo y el caso máximo son **los mismos dos casos en las dos velocidades**
+(EXTRA-3 y EXTRA-2 respectivamente) — el reloj no cambia cuál configuración es la más/menos
+costosa, solo cuánto tiempo real toma, coherente con el Hallazgo 1.
 
 En "en frío" (una sola ejecución, sin caché caliente — sección 7) el orden de mínimo/máximo es el
-mismo: 35.019 µs / 51.926 µs a 216MHz, y 506.188 µs / 689.125 µs (Caso 3, confirmado) a 16MHz —
-la diferencia entre "en frío" y "promedio" es marginal en estos casos porque para cuando se
-ejecutan (van 6° y 5° en `run_all_cases()`) la caché ya se calentó con las 1000 repeticiones del
-Caso 1 (ver Hallazgo 2, sección 9).
+mismo: 35.019 µs / 51.926 µs a 216MHz, y 472.062 µs / 700.375 µs a 16MHz — la diferencia entre
+"en frío" y "promedio" es marginal en estos dos casos porque para cuando se ejecutan (van 6° y 5°
+en `run_all_cases()`) la caché ya se calentó con las 1000 repeticiones del Caso 1 (ver Hallazgo 2,
+sección 9).
 
-**Rango total medido:** a 216MHz el peor caso tarda **49% más** que el mejor (52.037 vs 34.917
-µs, con EXTRA-3 ya confirmado como mínimo); a 16MHz, con los datos disponibles hoy (EXTRA-3 sin
-correr todavía), el peor caso confirmado tarda al menos **36% más** que el mejor confirmado
-(688.000 vs 505.500 µs) — ese porcentaje va a subir cuando se corra el EXTRA-3 a 16MHz, porque va
-a bajar el mínimo sin tocar el máximo. Es el mismo orden de magnitud en las dos velocidades —
-coherente con el Hallazgo 1 (el costo, en ciclos de CPU, no depende del reloj, solo el tiempo
-real).
+**Rango total medido:** el peor caso tarda **49.0% más** que el mejor, en **las dos velocidades**
+(52.037/34.917 = 1.4903 a 216MHz; 702.438/471.375 = 1.4902 a 16MHz — la misma proporción hasta la
+cuarta cifra decimal). Es la confirmación más limpia del Hallazgo 1 de todo el documento: el
+costo, en ciclos de CPU, es una propiedad del código y del caso de entrada, completamente
+independiente del reloj del sistema.
 
 ---
 
