@@ -397,6 +397,14 @@ void run_all_cases(void) {
                   90, 90, 90, 90, 90, 90);
     run_test_case("Caso EXTRA-2 [PEOR CASO: angulos irregulares, dentro de 0-180]",
                   137.6, 23.9, 168.2, 74.5, 109.3, 41.7);
+
+    // Caso EXTRA-3 -- mismo candidato a mejor caso teorico que en el proyecto
+    // de 216MHz (ver ese archivo para el comentario completo y la
+    // verificacion simbolica): th3=-90/th4=-90 cancelan el offset +90 de
+    // dh_rot(), dejando 5 de los 6 angulos evaluados en 0 grados exactos,
+    // y la combinacion sigue cayendo en la rama de singularidad (mag=0).
+    run_test_case("Caso EXTRA-3 [CANDIDATO MEJOR CASO TEORICO: singularidad + min. angulos]",
+                  0, 0, -90, -90, 90, 0);
 }
 
 void Boton_Init(void) {

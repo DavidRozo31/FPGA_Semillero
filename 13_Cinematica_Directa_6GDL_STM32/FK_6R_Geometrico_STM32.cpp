@@ -467,6 +467,22 @@ void run_all_cases(void) {
                   90, 90, 90, 90, 90, 90);
     run_test_case("Caso EXTRA-2 [PEOR CASO: angulos irregulares, dentro de 0-180]",
                   137.6, 23.9, 168.2, 74.5, 109.3, 41.7);
+
+    // -------------------------------------------------------------------
+    // Caso EXTRA-3 -- candidato a MEJOR CASO TEORICO real (no solo el mas
+    // facil "a ojo" como el EXTRA-1). Verificado con sympy (no a mano):
+    // th3=-90, th4=-90 cancelan el offset +90 que trae dh_rot() para R3/R4,
+    // asi que theta1, theta2, (theta3+90), (theta4+90) y theta6 quedan los
+    // 5 en 0 grados exactos (el argumento mas barato para cos()/sin(), ver
+    // leccion 13 seccion 9) -- y la combinacion SIGUE cayendo en la rama de
+    // singularidad (mag=0 exacto, confirmado simbolicamente), asi que
+    // tambien se ahorra los 2 atan2() de yaw/roll, igual que el Caso 2.
+    // Fuera del rango fisico real del servo (0-180 grados) por los th3/th4
+    // negativos -- es un caso PURAMENTE de benchmark de software, no una
+    // pose que se le vaya a pedir al brazo real.
+    // -------------------------------------------------------------------
+    run_test_case("Caso EXTRA-3 [CANDIDATO MEJOR CASO TEORICO: singularidad + min. angulos]",
+                  0, 0, -90, -90, 90, 0);
 }
 
 // ---------------------------------------------------------------------------

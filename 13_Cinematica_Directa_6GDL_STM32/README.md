@@ -569,6 +569,23 @@ la sección 9, pedidos explícitamente para acotar el rango real de tiempo dentr
 > repetir esa corrida puntual. El máximo **confirmado por medición completa** a 16MHz es el
 > Caso 3, con 688.000 µs.
 
+> **Candidato a mínimo aún mejor — Caso EXTRA-3 (agregado al código, pendiente de correr):**
+> el Caso 2 gana por evitar los 2 `atan2()` de la rama de singularidad (Hallazgo 4), pero sigue
+> evaluando 4 de sus 6 ángulos efectivos en 90° (`theta3+90°` y `theta4+90°` valen 90° cuando
+> `theta3=theta4=0`, por el offset de la tabla DH). Se buscó, verificando con álgebra simbólica
+> (`sympy`, no a mano) sobre las mismas matrices `R1..R6` de la sección 3, una combinación que
+> **siga cayendo exactamente en la misma rama de singularidad** (`mag=0`) pero con menos ángulos
+> "caros": `theta1=0, theta2=0, theta3=-90°, theta4=-90°, theta5=90°, theta6=0°`. Los `-90°` en
+> `theta3`/`theta4` cancelan el offset `+90°` de `dh_rot()`, dejando **5 de los 6 ángulos
+> evaluados en 0° exacto** (el más barato para `cos()/sin()`, sección 9) y solo uno en 90°
+> (`theta5`, que es intrínseco a esta singularidad de muñeca — no se puede eliminar sin dejar de
+> ser singular). Se confirmó `mag=0.0` exacto con sympy antes de tocar el firmware. Ya está
+> agregado como `Caso EXTRA-3` en los dos `.cpp`, pero **todavía no se ha corrido en la tarjeta
+> real** — la predicción es que sea el caso más rápido de los 6, por debajo del Caso 2, pero eso
+> hay que confirmarlo con TIM5, no asumirlo. **Nota:** `theta3`/`theta4` negativos quedan fuera
+> del rango físico real de un servomotor (0°-180°) — es un caso puramente de benchmark de
+> software, no una pose que se le vaya a pedir al brazo real.
+
 En "en frío" (una sola ejecución, sin caché caliente — sección 7) el orden de mínimo/máximo es el
 mismo: 37.500 µs / 52.037 µs a 216MHz, y 506.188 µs / 689.125 µs (Caso 3, confirmado) a 16MHz —
 la diferencia entre "en frío" y "promedio" es marginal en estos dos casos porque para cuando se
