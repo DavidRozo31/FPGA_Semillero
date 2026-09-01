@@ -22,10 +22,12 @@ línea por línea.
 | 11 | [Cinematica_Directa_Geometrica](11_Cinematica_Directa_Geometrica/README.md) | Cinemática directa 5R (posición + orientación) por método geométrico — mismo resultado que la lección 7, una fracción de los recursos lógicos | FPGA — cinemática |
 | 12 | [Cinematica_Directa_6GDL](12_Cinematica_Directa_6GDL/README.md) | De 5R+gripper a 6 GDL real: tabla DH corregida, la posición deja de ser independiente de la muñeca, y una crisis de recursos real (Fitter Failed) con su causa raíz medida y su arreglo | FPGA — cinemática |
 | 13 | [Cinematica_Directa_6GDL_STM32](13_Cinematica_Directa_6GDL_STM32/README.md) | La misma cinemática de 6 GDL portada a STM32 (216MHz vs 16MHz sin PLL), explicada paso a paso, y comparada en tiempo real contra la FPGA | STM32 — comparación |
+| 14 | [Desacople_Cinematico](14_Desacople_Cinematico/README.md) | Cinemática inversa 6GDL: de la pose deseada a los seis ángulos articulares, por desacople cinemático (muñeca esférica) | FPGA — cinemática inversa |
+| 15 | [Verificacion_MTH_vs_Geometrico](15_Verificacion_MTH_vs_Geometrico/README.md) | Verificación cruzada: el método geométrico (lecciones 11-13) contra matrices homogéneas 4×4 calculadas desde cero, mismos 3 casos de prueba | MATLAB — verificación |
 
 ### Orden de lectura recomendado
 
-`1 → 2 → 3 → 4 → 5 (opcional/histórico) → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13`
+`1 → 2 → 3 → 4 → 5 (opcional/histórico) → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15`
 
 Las lecciones 1-4 sientan las bases del lenguaje y las herramientas. La lección 5 documenta
 un intento anterior de cinemática **inversa** (ya no es la arquitectura activa del robot 2R,
