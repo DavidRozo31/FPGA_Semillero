@@ -30,12 +30,31 @@
 //          de bus != 1 -> el reloj de TIM se dobla, regla estandar del F7).
 // Salida:  USART3 (PD8=TX, PD9=RX, AF7) -> puerto virtual COM del ST-LINK.
 //         9600 baudios, BRR calculado para APB1=54MHz.
+//
+// ================== EXPERIMENTO EN STAND BY: libm vs CMSIS-DSP ============
+// Pregunta de los profes: ¿hay otra libreria para STM32 que SI de tiempo
+// estandar (constante), sin importar el angulo? Ya esta escrita una segunda
+// version de la cinematica (forward_kinematics_cmsis, mas abajo) que usa
+// arm_sin_f32()/arm_cos_f32() de CMSIS-DSP (tabla + interpolacion, tiempo
+// fijo) en vez de cos()/sin() de <math.h> (reduccion de rango, tiempo
+// variable -- leccion 13, seccion 9).
+//
+// A PROPOSITO desactivada por ahora (EXPERIMENTO_CMSIS_DSP = 0): primero se
+// recopilan los tiempos con libm solo (mejor caso / peor caso, mas abajo).
+// Cuando esos datos ya esten, poner esta macro en 1 -- eso activa el
+// include de CMSIS-DSP y la medicion doble en run_test_case(). Antes de
+// poner en 1, agregar el componente en Keil: Project > Manage Project Items
+// > Manage Run-Time Environment > CMSIS > marcar "DSP".
 // ============================================================================
+#define EXPERIMENTO_CMSIS_DSP 0
 
 #include <stm32f7xx.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#if EXPERIMENTO_CMSIS_DSP
+#include "arm_math.h"   // CMSIS-DSP -- arm_sin_f32 / arm_cos_f32
+#endif
 
 #define PI 3.14159265358979323846
 
@@ -182,6 +201,98 @@ FK_Result forward_kinematics(double theta1, double theta2, double theta3,
 }
 
 // ---------------------------------------------------------------------------
+// dh_rot(), pero con arm_cos_f32()/arm_sin_f32() de CMSIS-DSP en vez de
+// cos()/sin() de <math.h> -- para el experimento libm vs CMSIS-DSP (ver
+// comentario de cabecera). arm_cos_f32/arm_sin_f32 trabajan en float
+// (float32_t), no double -- se convierte al entrar y al guardar en la
+// matriz (Mat3 sigue siendo double, para poder reusar mat3_mul/mat3_vec
+// tal cual, sin duplicarlos).
+//
+// EN STAND BY -- solo se compila si EXPERIMENTO_CMSIS_DSP = 1 (ver arriba).
+// ---------------------------------------------------------------------------
+#if EXPERIMENTO_CMSIS_DSP
+void dh_rot_cmsis(double theta, double alpha, Mat3 out) {
+    float32_t ct = arm_cos_f32((float32_t)theta);
+    float32_t st = arm_sin_f32((float32_t)theta);
+    float32_t ca = arm_cos_f32((float32_t)alpha);
+    float32_t sa = arm_sin_f32((float32_t)alpha);
+    out[0][0] = ct;   out[0][1] = -st*ca;  out[0][2] =  st*sa;
+    out[1][0] = st;   out[1][1] =  ct*ca;  out[1][2] = -ct*sa;
+    out[2][0] = 0;    out[2][1] =  sa;     out[2][2] =  ca;
+}
+
+// forward_kinematics(), identica en todo excepto que arma R1..R6 con
+// dh_rot_cmsis() en vez de dh_rot() -- mat3_mul/mat3_vec (pura aritmetica,
+// sin trigonometria) quedan exactamente iguales, y yaw/pitch/roll se siguen
+// extrayendo con atan2()/sqrt() de <math.h> (eso NO es lo que se esta
+// comparando aqui -- el experimento es solo sobre cos()/sin()).
+FK_Result forward_kinematics_cmsis(double theta1, double theta2, double theta3,
+                                    double theta4, double theta5, double theta6) {
+    Mat3 R1, R2, R3, R4, R5, R6, R02, R03, R04, R05, R06;
+    dh_rot_cmsis(theta1,          PI/2,  R1);
+    dh_rot_cmsis(theta2,          0,     R2);
+    dh_rot_cmsis(theta3 + PI/2,   PI/2,  R3);
+    dh_rot_cmsis(theta4 + PI/2,   PI/2,  R4);
+    dh_rot_cmsis(theta5,         -PI/2,  R5);
+    dh_rot_cmsis(theta6,          0,     R6);
+
+    mat3_mul(R1, R2, R02);
+    mat3_mul(R02, R3, R03);
+    mat3_mul(R03, R4, R04);
+    mat3_mul(R04, R5, R05);
+    mat3_mul(R05, R6, R06);
+
+    Mat3 I3 = {{1,0,0},{0,1,0},{0,0,1}};
+    double O[3] = {0,0,0};
+    double p[3], Rp[3];
+
+    p[0]=0; p[1]=0; p[2]=L1;
+    mat3_vec(I3, p, Rp);
+    O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+    p[0]=L2*cos(theta2); p[1]=L2*sin(theta2); p[2]=0;
+    mat3_vec(R1, p, Rp);
+    O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+    p[0]=0; p[1]=0; p[2]=0;
+    mat3_vec(R02, p, Rp);
+    O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+    p[0]=0; p[1]=0; p[2]=LD4;
+    mat3_vec(R03, p, Rp);
+    O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+    p[0]=0; p[1]=0; p[2]=0;
+    mat3_vec(R04, p, Rp);
+    O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+    p[0]=0; p[1]=0; p[2]=LD6;
+    mat3_vec(R05, p, Rp);
+    O[0]+=Rp[0]; O[1]+=Rp[1]; O[2]+=Rp[2];
+
+    double x = O[0], y = O[1], z = O[2];
+
+    double R11 = R06[0][0], R21 = R06[1][0], R31 = R06[2][0];
+    double R32 = R06[2][1], R33 = R06[2][2];
+
+    double mag   = sqrt(R11*R11 + R21*R21);
+    double pitch = atan2(-R31, mag);
+    double yaw, roll;
+
+    if (mag < EPS_SINGULARIDAD) {
+        yaw  = 0.0;
+        roll = PI;
+    } else {
+        yaw  = atan2(R21, R11);
+        roll = atan2(R32, R33);
+    }
+
+    FK_Result res = { x, y, z, yaw, pitch, roll };
+    return res;
+}
+#endif // EXPERIMENTO_CMSIS_DSP
+
+// ---------------------------------------------------------------------------
 // Reloj a 216 MHz (identico a FK_5R_Geometrico_STM32)
 // ---------------------------------------------------------------------------
 void SystemClock_216MHz(void) {
@@ -276,14 +387,13 @@ void run_test_case(const char *nombre, double th1_deg, double th2_deg,
 
     char buf[180];
 
-    // Medicion "en frio" -- una sola ejecucion
+    // ---- version 1: libm de <math.h> (cos()/sin()/atan2(), reduccion de rango) ----
     TIM5->CNT = 0;
     TIM5->CR1 |= (1<<0);                   // arranca el conteo
     FK_Result r = forward_kinematics(t1, t2, t3, t4, t5, t6);
     TIM5->CR1 &= ~(1<<0);                  // para el conteo
     uint32_t ticks_frio = TIM5->CNT;
 
-    // Medicion en estado estable -- promedio de N_REPS ejecuciones seguidas
     TIM5->CNT = 0;
     TIM5->CR1 |= (1<<0);
     for (int i = 0; i < N_REPS; i++) {
@@ -291,6 +401,23 @@ void run_test_case(const char *nombre, double th1_deg, double th2_deg,
     }
     TIM5->CR1 &= ~(1<<0);
     uint32_t ticks_prom = TIM5->CNT / N_REPS;
+
+#if EXPERIMENTO_CMSIS_DSP
+    // ---- version 2: CMSIS-DSP (arm_cos_f32()/arm_sin_f32(), tabla + interpolacion) ----
+    TIM5->CNT = 0;
+    TIM5->CR1 |= (1<<0);
+    FK_Result rc = forward_kinematics_cmsis(t1, t2, t3, t4, t5, t6);
+    TIM5->CR1 &= ~(1<<0);
+    uint32_t ticks_frio_c = TIM5->CNT;
+
+    TIM5->CNT = 0;
+    TIM5->CR1 |= (1<<0);
+    for (int i = 0; i < N_REPS; i++) {
+        rc = forward_kinematics_cmsis(t1, t2, t3, t4, t5, t6);
+    }
+    TIM5->CR1 &= ~(1<<0);
+    uint32_t ticks_prom_c = TIM5->CNT / N_REPS;
+#endif
 
     snprintf(buf, sizeof(buf),
         "\r\n=== %s ===\r\n"
@@ -310,6 +437,14 @@ void run_test_case(const char *nombre, double th1_deg, double th2_deg,
         (unsigned long)ticks_frio, ticks_frio / TIM5_CLK_MHZ,
         N_REPS, (unsigned long)ticks_prom, ticks_prom / TIM5_CLK_MHZ);
     USART3_SendString(buf);
+
+#if EXPERIMENTO_CMSIS_DSP
+    snprintf(buf, sizeof(buf),
+        "  [CMSIS-DSP] ticks TIM5 (en frio) = %lu (%.3f us)   (promedio %d) = %lu (%.3f us)\r\n",
+        (unsigned long)ticks_frio_c, ticks_frio_c / TIM5_CLK_MHZ,
+        N_REPS, (unsigned long)ticks_prom_c, ticks_prom_c / TIM5_CLK_MHZ);
+    USART3_SendString(buf);
+#endif
 }
 
 void run_all_cases(void) {
@@ -317,6 +452,37 @@ void run_all_cases(void) {
     run_test_case("Caso 1 [extendido] q=0",                0,  0,   0,  0,  0,   0);
     run_test_case("Caso 2 [SINGULARIDAD del 6R] th5=90 th6=90", 0, 0, 0, 0, 90, 90);
     run_test_case("Caso 3 [generico]",                     30, 20, -15, 45, 60, -70);
+
+    // -------------------------------------------------------------------
+    // Casos EXTRA -- pedido de los profes: estandarizar/caracterizar mejor
+    // el rango de tiempos, probando la configuracion de MENOR esfuerzo
+    // posible para el CPU contra la MAS complicada posible, pero dentro
+    // del rango real de movimiento de un servomotor (0 a 180 grados) --
+    // el Caso PEOR SI es una pose fisicamente alcanzable, solo que con
+    // angulos irregulares (con decimales, lejos de cualquier multiplo de
+    // 90) que fuerzan al maximo la reduccion de rango de cos()/sin()
+    // (ver leccion 13, seccion 9).
+    // -------------------------------------------------------------------
+    run_test_case("Caso EXTRA-1 [MEJOR CASO: los 6 angulos en 90 grados]",
+                  90, 90, 90, 90, 90, 90);
+    run_test_case("Caso EXTRA-2 [PEOR CASO: angulos irregulares, dentro de 0-180]",
+                  137.6, 23.9, 168.2, 74.5, 109.3, 41.7);
+
+    // -------------------------------------------------------------------
+    // Caso EXTRA-3 -- candidato a MEJOR CASO TEORICO real (no solo el mas
+    // facil "a ojo" como el EXTRA-1). Verificado con sympy (no a mano):
+    // th3=-90, th4=-90 cancelan el offset +90 que trae dh_rot() para R3/R4,
+    // asi que theta1, theta2, (theta3+90), (theta4+90) y theta6 quedan los
+    // 5 en 0 grados exactos (el argumento mas barato para cos()/sin(), ver
+    // leccion 13 seccion 9) -- y la combinacion SIGUE cayendo en la rama de
+    // singularidad (mag=0 exacto, confirmado simbolicamente), asi que
+    // tambien se ahorra los 2 atan2() de yaw/roll, igual que el Caso 2.
+    // Fuera del rango fisico real del servo (0-180 grados) por los th3/th4
+    // negativos -- es un caso PURAMENTE de benchmark de software, no una
+    // pose que se le vaya a pedir al brazo real.
+    // -------------------------------------------------------------------
+    run_test_case("Caso EXTRA-3 [CANDIDATO MEJOR CASO TEORICO: singularidad + min. angulos]",
+                  0, 0, -90, -90, 90, 0);
 }
 
 // ---------------------------------------------------------------------------

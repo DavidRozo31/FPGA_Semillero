@@ -1,34 +1,47 @@
 // ============================================================================
-// FK_6R_Geometrico_STM32_HSI16MHz.cpp
+// FK_6R_Geometrico_STM32_CMSIS.cpp
 //
-// MISMO codigo de cinematica directa (metodo geometrico, 6 GDL real) que
-// FK_6R_Geometrico_STM32.cpp -- la UNICA diferencia entre los dos proyectos
-// es el reloj: este corre a la velocidad "de fabrica" (HSI interno, 16MHz,
-// SIN PLL), el otro corre a 216MHz (maxima velocidad del STM32F767ZI, PLL
-// con Over-drive). Comparar los ciclos/tiempo de los dos da el efecto puro
-// de subir el reloj, sin cambiar ni una linea de la logica de calculo.
+// Proyecto GEMELO de FK_6R_Geometrico_STM32.cpp (216MHz), pero DEDICADO al
+// experimento libm vs CMSIS-DSP -- se separo a un archivo/proyecto Keil
+// distinto a proposito, para no tocar el .cpp ya validado y documentado en
+// la leccion 13 (README, secciones 8-11). Cinematica, geometria del brazo,
+// casos de prueba, reloj (216MHz) y medicion (TIM5) son EXACTAMENTE iguales
+// a FK_6R_Geometrico_STM32.cpp -- la UNICA diferencia real es que aqui el
+// experimento de CMSIS-DSP esta ACTIVADO (EXPERIMENTO_CMSIS_DSP = 1).
 //
-// ================== REVISION 2 (correccion del profesor) ==================
-// Mismos dos cambios que FK_6R_Geometrico_STM32.cpp -- ver ese archivo para
-// la explicacion completa:
-// 1) Posicion: metodo recursivo eslabon-por-eslabon (Inversa2R.pdf del
-//    profesor) en vez del atajo trigonometrico anterior.
-// 2) Medicion de tiempo: TIM5 en vez de DWT->CYCCNT.
-// 3) Experimento libm vs CMSIS-DSP (forward_kinematics_cmsis) -- EN STAND BY
-//    por ahora (EXPERIMENTO_CMSIS_DSP=0 mas abajo), ver el comentario
-//    completo en FK_6R_Geometrico_STM32.cpp.
+// ================== PREGUNTA QUE RESPONDE ESTE PROYECTO ====================
+// La leccion 13 (secciones 3 y 9) encontro que cos()/sin() de <math.h>
+// (ARM Compiler 6 libm) NO tardan lo mismo para cualquier angulo -- tienen
+// rutas rapidas para angulos "limpios" (0 grados, multiplos de 90 grados) y
+// rutas lentas (reduccion de rango completa) para angulos genericos, lo que
+// hace que el peor caso (Caso EXTRA-2, angulos irregulares) tarde ~49% mas
+// que el mejor caso (Caso EXTRA-3, singularidad + angulos minimos). Los
+// profesores preguntaron: ¿hay otra libreria para STM32 que SI de un tiempo
+// ESTANDAR (constante), sin importar el angulo? La respuesta candidata es
+// CMSIS-DSP: arm_sin_f32()/arm_cos_f32() usan una tabla precalculada +
+// interpolacion lineal en vez de reduccion de rango + polinomio -- en teoria,
+// tiempo fijo sin importar el angulo (a costa de menos precision, float en
+// vez de double). Este proyecto mide si eso es cierto en la practica.
+//
+// ================== COMO ACTIVAR EL COMPONENTE CMSIS-DSP EN KEIL ===========
+// Este .cpp YA tiene EXPERIMENTO_CMSIS_DSP = 1 y el codigo de
+// forward_kinematics_cmsis() listo -- pero el proyecto Keil (clonado del
+// original) TODAVIA NO tiene el componente CMSIS-DSP agregado. Paso manual
+// obligatorio antes de compilar (una sola vez):
+//   1. Abrir FK_6R_Geometrico_STM32_CMSIS.uvprojx en Keil uVision5.
+//   2. Project > Manage Project Items... > Manage Run-Time Environment.
+//   3. En el arbol, expandir "CMSIS" y marcar la casilla "DSP".
+//   4. Keil pregunta que variante de libreria usar (o la resuelve solo segun
+//      el FPU del dispositivo) -- aceptar la que proponga por defecto para
+//      Cortex-M7 con FPU doble precision.
+//   5. OK -- Keil agrega el include path y la libreria .lib correctas solas.
+//      NO se edito el .uvprojx a mano para esto porque la version exacta de
+//      la libreria depende del pack instalado -- mas seguro dejar que el
+//      propio Keil la resuelva.
+//   6. Build (F7). Si compila, Download y correr -- mismo protocolo de la
+//      leccion 13 (HTerm/PuTTY, 9600 baudios, boton B1 repite los 6 casos).
 // ============================================================================
-//
-// Reloj:  HSI directo, 16 MHz, sin PLL. AHB=APB1=APB2=16MHz (sin prescalers,
-//         es el estado por defecto al resetear el chip -- se deja explicito
-//         aqui solo para que quede documentado, no porque haga falta).
-// Medicion: TIM5->CNT, con TIM5 corriendo a 16MHz (APB1=16MHz CON prescaler
-//          de bus =/1 -> el reloj de TIM NO se dobla, a diferencia de la
-//          version de 216MHz -- regla estandar del arbol de reloj del F7).
-// Salida:  USART3 (PD8=TX, PD9=RX, AF7) -> puerto virtual COM del ST-LINK.
-//         9600 baudios, BRR recalculado para APB1=16MHz (antes era 54MHz).
-// ============================================================================
-#define EXPERIMENTO_CMSIS_DSP 0
+#define EXPERIMENTO_CMSIS_DSP 1
 
 #include <stm32f7xx.h>
 #include <stdio.h>
@@ -48,6 +61,8 @@
 #define LD4  0.140   // L3+L4 = 0.095+0.045 (el sistema 3 coincide con el 2, "regla 4")
 #define LD6  0.173   // L5+L6 = 0.07+0.103  (el sistema 5 coincide con el 4, "regla 4")
 
+// Umbral para detectar gimbal lock (|cos(pitch)| por debajo de esto se
+// considera singularidad). Igual criterio que el brazo de 5R.
 #define EPS_SINGULARIDAD 1e-6
 
 typedef struct {
@@ -57,6 +72,9 @@ typedef struct {
 
 typedef double Mat3[3][3];
 
+// R_i = Rz(theta) * Rx(alpha) -- forma generica de una matriz de rotacion DH,
+// igual formula que Metodo_Geometrico_RPY_6R.m -- version libm (cos/sin de
+// <math.h>), identica a FK_6R_Geometrico_STM32.cpp.
 void dh_rot(double theta, double alpha, Mat3 out) {
     double ct = cos(theta), st = sin(theta);
     double ca = cos(alpha), sa = sin(alpha);
@@ -89,8 +107,10 @@ void mat3_vec(const Mat3 R, const double v[3], double out[3]) {
 }
 
 // ---------------------------------------------------------------------------
-// Cinematica directa geometrica, brazo de 6 GDL real (IDENTICA a la version
-// de 216MHz -- ver ese archivo para la explicacion completa de cada parte).
+// Cinematica directa geometrica, brazo de 6 GDL real -- version libm.
+// Identica a FK_6R_Geometrico_STM32.cpp (ver ese archivo / README leccion 13
+// para la explicacion completa de cada parte). Sirve como referencia (el
+// "Caso base") contra la que se compara la version CMSIS-DSP mas abajo.
 // ---------------------------------------------------------------------------
 FK_Result forward_kinematics(double theta1, double theta2, double theta3,
                               double theta4, double theta5, double theta6) {
@@ -108,7 +128,6 @@ FK_Result forward_kinematics(double theta1, double theta2, double theta3,
     mat3_mul(R04, R5, R05);
     mat3_mul(R05, R6, R06);
 
-    // Posicion: O_i = O_(i-1) + R_(i-1)^0 * p_i , eslabon por eslabon.
     Mat3 I3 = {{1,0,0},{0,1,0},{0,0,1}};
     double O[3] = {0,0,0};
     double p[3], Rp[3];
@@ -142,13 +161,13 @@ FK_Result forward_kinematics(double theta1, double theta2, double theta3,
     double R11 = R06[0][0], R21 = R06[1][0], R31 = R06[2][0];
     double R32 = R06[2][1], R33 = R06[2][2];
 
-    double mag   = sqrt(R11*R11 + R21*R21);
+    double mag   = sqrt(R11*R11 + R21*R21); // = |cos(pitch)|
     double pitch = atan2(-R31, mag);
     double yaw, roll;
 
     if (mag < EPS_SINGULARIDAD) {
         yaw  = 0.0;
-        roll = PI;
+        roll = PI; // 180 grados
     } else {
         yaw  = atan2(R21, R11);
         roll = atan2(R32, R33);
@@ -159,11 +178,12 @@ FK_Result forward_kinematics(double theta1, double theta2, double theta3,
 }
 
 // ---------------------------------------------------------------------------
-// dh_rot()/forward_kinematics() con CMSIS-DSP (arm_cos_f32/arm_sin_f32) en
-// vez de <math.h> -- ver el comentario completo en FK_6R_Geometrico_STM32.cpp.
-// EN STAND BY -- solo se compila si EXPERIMENTO_CMSIS_DSP = 1 (ver arriba).
+// dh_rot(), pero con arm_cos_f32()/arm_sin_f32() de CMSIS-DSP en vez de
+// cos()/sin() de <math.h> -- ESTE es el experimento real de este archivo.
+// arm_cos_f32/arm_sin_f32 trabajan en float (float32_t), no double -- se
+// convierte al entrar y al guardar en la matriz (Mat3 sigue siendo double,
+// para poder reusar mat3_mul/mat3_vec tal cual, sin duplicarlos).
 // ---------------------------------------------------------------------------
-#if EXPERIMENTO_CMSIS_DSP
 void dh_rot_cmsis(double theta, double alpha, Mat3 out) {
     float32_t ct = arm_cos_f32((float32_t)theta);
     float32_t st = arm_sin_f32((float32_t)theta);
@@ -174,6 +194,11 @@ void dh_rot_cmsis(double theta, double alpha, Mat3 out) {
     out[2][0] = 0;    out[2][1] =  sa;     out[2][2] =  ca;
 }
 
+// forward_kinematics(), identica en todo excepto que arma R1..R6 con
+// dh_rot_cmsis() en vez de dh_rot() -- mat3_mul/mat3_vec (pura aritmetica,
+// sin trigonometria) quedan exactamente iguales, y yaw/pitch/roll se siguen
+// extrayendo con atan2()/sqrt() de <math.h> (eso NO es lo que se esta
+// comparando aqui -- el experimento es solo sobre cos()/sin()).
 FK_Result forward_kinematics_cmsis(double theta1, double theta2, double theta3,
                                     double theta4, double theta5, double theta6) {
     Mat3 R1, R2, R3, R4, R5, R6, R02, R03, R04, R05, R06;
@@ -238,26 +263,39 @@ FK_Result forward_kinematics_cmsis(double theta1, double theta2, double theta3,
     FK_Result res = { x, y, z, yaw, pitch, roll };
     return res;
 }
-#endif // EXPERIMENTO_CMSIS_DSP
 
 // ---------------------------------------------------------------------------
-// Reloj a 16 MHz -- HSI directo, SIN PLL. En un STM32F7 recien reseteado
-// SW ya esta en HSI por defecto (esto queda aqui solo para documentar la
-// intencion explicitamente, no porque haga falta tocar ningun registro).
+// Reloj a 216 MHz -- identico a FK_6R_Geometrico_STM32.cpp (mismo Over-drive,
+// misma cadena de PLL). Se corre a la velocidad maxima porque es donde mas
+// se nota cualquier diferencia entre libm y CMSIS-DSP en microsegundos.
 // ---------------------------------------------------------------------------
-void SystemClock_HSI16MHz(void) {
-    RCC->CR |= (1<<0);                     // HSION (por si acaso)
-    while (!(RCC->CR & (1<<1)));           // espera HSIRDY
+void SystemClock_216MHz(void) {
+    RCC->APB1ENR |= (1<<28);               // PWREN
+    PWR->CR1 |= (0b11<<14);                // VOS = Scale 1
+    PWR->CR1 |= (1<<16);                   // ODEN (Over-drive)
+    while (!(PWR->CSR1 & (1<<16)));        // espera ODRDY
+    PWR->CR1 |= (1<<17);                   // ODSWEN (conmuta a Over-drive)
+    while (!(PWR->CSR1 & (1<<17)));        // espera ODSWRDY
 
-    RCC->CFGR &= ~(0b11<<0);               // SW = HSI (000)
-    while (((RCC->CFGR>>2) & 0b11) != 0b00); // espera SWS = HSI
+    FLASH->ACR = 7 | (1<<8) | (1<<9);      // 7 wait states + prefetch + ART
 
-    // HPRE, PPRE1, PPRE2 se dejan en /1 (reset por defecto) -> AHB=APB1=APB2=16MHz
-    SystemCoreClock = 16000000UL;
+    // HSI=16MHz -> PLLM=16 -> 1MHz -> PLLN=432 -> 432MHz -> PLLP=2 -> 216MHz
+    RCC->PLLCFGR = (16UL<<0) | (432UL<<6) | (0UL<<16) | (9UL<<24); // PLLSRC=0 -> HSI
+
+    RCC->CR |= (1<<24);                    // PLLON
+    while (!(RCC->CR & (1<<25)));          // espera PLLRDY
+
+    RCC->CFGR |= (0b101<<10);              // APB1 = AHB/4  -> 54 MHz
+    RCC->CFGR |= (0b100<<13);              // APB2 = AHB/2  -> 108 MHz
+
+    RCC->CFGR |= (0b10<<0);                // SW = PLL
+    while (((RCC->CFGR>>2) & 0b11) != 0b10); // espera SWS = PLL
+
+    SystemCoreClock = 216000000UL;
 }
 
-#define AHB_CLK_HZ   16000000UL
-#define APB1_CLK_HZ  16000000UL
+#define AHB_CLK_HZ   216000000UL
+#define APB1_CLK_HZ  54000000UL
 
 void SysTick_Wait(uint32_t n) {
     SysTick->LOAD = n - 1;
@@ -272,7 +310,6 @@ void SysTick_ms(uint32_t x) {
 
 // ---------------------------------------------------------------------------
 // USART3 (PD8=TX, PD9=RX, AF7) -- VCP del ST-LINK en las Nucleo-144.
-// BRR recalculado para APB1=16MHz (antes 54MHz a 216MHz de reloj de sistema).
 // ---------------------------------------------------------------------------
 void USART3_Init(void) {
     RCC->AHB1ENR |= (1<<3);                // GPIOD
@@ -296,13 +333,10 @@ void USART3_SendString(const char *s) {
 }
 
 // ---------------------------------------------------------------------------
-// TIM5 -- medicion de tiempo (reemplaza a DWT->CYCCNT, pedido del profesor).
-// PSC=0 (resolucion maxima). Aqui APB1=16MHz CON prescaler de bus =/1
-// (HPRE/PPRE1 en reset por defecto), asi que el reloj de TIM5 NO se dobla:
-// TIM5 corre a 16MHz -- distinto a la version de 216MHz, donde TIM5 SI se
-// dobla a 108MHz porque ahi el prescaler de APB1 es /4.
+// TIM5 -- misma medicion de tiempo que la leccion 13 (TIM5 a 108MHz a
+// 216MHz, ver seccion 6 del README para la explicacion del doblado de reloj).
 // ---------------------------------------------------------------------------
-#define TIM5_CLK_MHZ 16.0
+#define TIM5_CLK_MHZ 108.0
 
 void TIM5_Init(void) {
     RCC->APB1ENR |= (1<<3);                // TIM5EN
@@ -311,7 +345,7 @@ void TIM5_Init(void) {
     TIM5->CNT = 0;
 }
 
-#define N_REPS 1000
+#define N_REPS 1000  // repeticiones para el promedio en estado estable (cache caliente)
 
 void run_test_case(const char *nombre, double th1_deg, double th2_deg,
                     double th3_deg, double th4_deg, double th5_deg, double th6_deg) {
@@ -322,12 +356,13 @@ void run_test_case(const char *nombre, double th1_deg, double th2_deg,
     double t5 = th5_deg * PI / 180.0;
     double t6 = th6_deg * PI / 180.0;
 
-    char buf[180];
+    char buf[220];
 
+    // ---- version 1: libm de <math.h> (cos()/sin()/atan2(), reduccion de rango) ----
     TIM5->CNT = 0;
-    TIM5->CR1 |= (1<<0);
+    TIM5->CR1 |= (1<<0);                   // arranca el conteo
     FK_Result r = forward_kinematics(t1, t2, t3, t4, t5, t6);
-    TIM5->CR1 &= ~(1<<0);
+    TIM5->CR1 &= ~(1<<0);                  // para el conteo
     uint32_t ticks_frio = TIM5->CNT;
 
     TIM5->CNT = 0;
@@ -338,7 +373,6 @@ void run_test_case(const char *nombre, double th1_deg, double th2_deg,
     TIM5->CR1 &= ~(1<<0);
     uint32_t ticks_prom = TIM5->CNT / N_REPS;
 
-#if EXPERIMENTO_CMSIS_DSP
     // ---- version 2: CMSIS-DSP (arm_cos_f32()/arm_sin_f32(), tabla + interpolacion) ----
     TIM5->CNT = 0;
     TIM5->CR1 |= (1<<0);
@@ -353,7 +387,6 @@ void run_test_case(const char *nombre, double th1_deg, double th2_deg,
     }
     TIM5->CR1 &= ~(1<<0);
     uint32_t ticks_prom_c = TIM5->CNT / N_REPS;
-#endif
 
     snprintf(buf, sizeof(buf),
         "\r\n=== %s ===\r\n"
@@ -362,63 +395,62 @@ void run_test_case(const char *nombre, double th1_deg, double th2_deg,
     USART3_SendString(buf);
 
     snprintf(buf, sizeof(buf),
-        "  x=%.4f m  y=%.4f m  z=%.4f m\r\n"
-        "  yaw=%.2f deg  pitch=%.2f deg  roll=%.2f deg\r\n",
+        "  [libm]      x=%.4f y=%.4f z=%.4f  yaw=%.2f pitch=%.2f roll=%.2f\r\n",
         r.x, r.y, r.z, r.yaw*180.0/PI, r.pitch*180.0/PI, r.roll*180.0/PI);
     USART3_SendString(buf);
 
     snprintf(buf, sizeof(buf),
-        "  ticks TIM5 (1 ejecucion, en frio)    = %lu  (%.3f us)\r\n"
-        "  ticks TIM5 (promedio %d ejecuciones) = %lu  (%.3f us)\r\n",
+        "  [CMSIS-DSP] x=%.4f y=%.4f z=%.4f  yaw=%.2f pitch=%.2f roll=%.2f\r\n",
+        rc.x, rc.y, rc.z, rc.yaw*180.0/PI, rc.pitch*180.0/PI, rc.roll*180.0/PI);
+    USART3_SendString(buf);
+
+    snprintf(buf, sizeof(buf),
+        "  [libm]      ticks TIM5 (en frio) = %lu (%.3f us)   (promedio %d) = %lu (%.3f us)\r\n",
         (unsigned long)ticks_frio, ticks_frio / TIM5_CLK_MHZ,
         N_REPS, (unsigned long)ticks_prom, ticks_prom / TIM5_CLK_MHZ);
     USART3_SendString(buf);
 
-#if EXPERIMENTO_CMSIS_DSP
     snprintf(buf, sizeof(buf),
         "  [CMSIS-DSP] ticks TIM5 (en frio) = %lu (%.3f us)   (promedio %d) = %lu (%.3f us)\r\n",
         (unsigned long)ticks_frio_c, ticks_frio_c / TIM5_CLK_MHZ,
         N_REPS, (unsigned long)ticks_prom_c, ticks_prom_c / TIM5_CLK_MHZ);
     USART3_SendString(buf);
-#endif
 }
 
 void run_all_cases(void) {
+    // Mismos 6 casos de la leccion 13 (secciones 8-10) -- incluidos los 3
+    // EXTRA (mejor caso "a ojo", peor caso realista, y el mejor caso real
+    // EXTRA-3 encontrado por sympy) para poder comparar libm vs CMSIS-DSP
+    // exactamente en los mismos puntos donde ya se caracterizo el rango de
+    // tiempo con libm solo.
     run_test_case("Caso 1 [extendido] q=0",                0,  0,   0,  0,  0,   0);
     run_test_case("Caso 2 [SINGULARIDAD del 6R] th5=90 th6=90", 0, 0, 0, 0, 90, 90);
     run_test_case("Caso 3 [generico]",                     30, 20, -15, 45, 60, -70);
-
-    // Casos EXTRA -- mismo experimento que en el proyecto de 216MHz (ver ese
-    // archivo para el comentario completo): MEJOR caso (menor esfuerzo
-    // posible para el CPU: los 6 angulos en 90 grados) vs. PEOR caso dentro
-    // del rango real de un servomotor (0-180 grados, pero con angulos
-    // irregulares que fuerzan al maximo la reduccion de rango).
-    run_test_case("Caso EXTRA-1 [MEJOR CASO: los 6 angulos en 90 grados]",
+    run_test_case("Caso EXTRA-1 [MEJOR CASO 'a ojo': los 6 angulos en 90 grados]",
                   90, 90, 90, 90, 90, 90);
     run_test_case("Caso EXTRA-2 [PEOR CASO: angulos irregulares, dentro de 0-180]",
                   137.6, 23.9, 168.2, 74.5, 109.3, 41.7);
-
-    // Caso EXTRA-3 -- mismo candidato a mejor caso teorico que en el proyecto
-    // de 216MHz (ver ese archivo para el comentario completo y la
-    // verificacion simbolica): th3=-90/th4=-90 cancelan el offset +90 de
-    // dh_rot(), dejando 5 de los 6 angulos evaluados en 0 grados exactos,
-    // y la combinacion sigue cayendo en la rama de singularidad (mag=0).
-    run_test_case("Caso EXTRA-3 [CANDIDATO MEJOR CASO TEORICO: singularidad + min. angulos]",
+    run_test_case("Caso EXTRA-3 [MEJOR CASO REAL: singularidad + min. angulos]",
                   0, 0, -90, -90, 90, 0);
 }
 
+// ---------------------------------------------------------------------------
+// Boton de usuario (PC13) -- repite los 6 casos cada vez que se presiona.
+// ---------------------------------------------------------------------------
 void Boton_Init(void) {
     RCC->AHB1ENR |= (1<<2);                // GPIOC
 
     GPIOC->MODER &= ~(0b11<<26);           // PC13 entrada
     GPIOC->PUPDR &= ~(0b11<<26);
-    GPIOC->PUPDR |= (0b01<<26);            // pull-up (B1 no trae resistencia externa)
+    GPIOC->PUPDR |= (0b01<<26);            // pull-up (B1 en Nucleo-144 no
+                                            // trae resistencia externa; idle=1,
+                                            // presionado=0)
 }
 
 int main(void) {
-    SystemClock_HSI16MHz();
+    SystemClock_216MHz();
 
-    SCB_EnableICache();
+    SCB_EnableICache();                    // I-cache y D-cache del Cortex-M7
     SCB_EnableDCache();
 
     TIM5_Init();
@@ -428,15 +460,15 @@ int main(void) {
     SysTick->LOAD = 0x00FFFFFF;
     SysTick->CTRL |= (0b101);
 
-    USART3_SendString("\r\n\r\n=== Cinematica Directa 6 GDL real -- STM32F767ZI @ 16MHz (HSI, sin PLL, TIM5) ===\r\n");
-    USART3_SendString("Presiona el boton de usuario (B1) para repetir las 3 pruebas.\r\n");
+    USART3_SendString("\r\n\r\n=== Cinematica Directa 6 GDL -- STM32F767ZI @ 216MHz -- libm vs CMSIS-DSP (TIM5) ===\r\n");
+    USART3_SendString("Presiona el boton de usuario (B1) para repetir los 6 casos.\r\n");
     run_all_cases();
 
-    uint8_t boton_anterior = 1;
+    uint8_t boton_anterior = 1; // idle = 1 (pull-up)
     while (1) {
         uint8_t boton_actual = (GPIOC->IDR >> 13) & 1;
-        if (boton_anterior == 1 && boton_actual == 0) {
-            SysTick_ms(30);
+        if (boton_anterior == 1 && boton_actual == 0) { // flanco de bajada = presionado
+            SysTick_ms(30); // antirrebote
             if (((GPIOC->IDR >> 13) & 1) == 0) {
                 run_all_cases();
             }
