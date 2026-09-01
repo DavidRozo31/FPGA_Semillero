@@ -62,6 +62,7 @@ preguntas distintas:
 10. [Mínimo y máximo medido, por reloj](#10-mínimo-y-máximo-medido-por-reloj)
 11. [FPGA vs. STM32 — la comparación final](#11-fpga-vs-stm32--la-comparación-final)
 12. [Cómo compilar y correr en Keil](#12-cómo-compilar-y-correr-en-keil)
+13. [Próximo experimento: libm vs CMSIS-DSP](#13-próximo-experimento-libm-vs-cmsis-dsp-montado-resultados-pendientes)
 
 ---
 
@@ -673,3 +674,25 @@ velocidad, gana en **previsibilidad**, una propiedad aparte y clave para control
 4. Al resetear la tarjeta corre automáticamente `run_all_cases()` una vez — presionar el botón
    de usuario (B1) la repite cuantas veces se quiera, para confirmar que los ciclos son estables
    entre corridas (ver sección 8, tres corridas iguales por velocidad).
+
+---
+
+## 13. Próximo experimento: libm vs CMSIS-DSP (montado, resultados pendientes)
+
+Pregunta de los profesores a partir del Hallazgo 3/4: ¿existe una librería para STM32 que dé un
+tiempo **estándar** (constante), sin importar el ángulo, a diferencia de `cos()/sin()` de
+`<math.h>`? La candidata es **CMSIS-DSP** (`arm_sin_f32()`/`arm_cos_f32()`), que usa tabla
+precalculada + interpolación en vez de reducción de rango + polinomio — en teoría, tiempo fijo
+sin importar el ángulo (a costa de trabajar en `float` de precisión simple en vez de `double`).
+
+Para no tocar el `.cpp` de esta lección (ya validado y con todos los resultados de las secciones
+8-11), el experimento se armó en un **proyecto Keil separado**:
+`FK_6R_Geometrico_STM32_CMSIS/FK_6R_Geometrico_STM32_CMSIS.cpp` — mismo robot, mismos 6 casos de
+prueba (incluido el EXTRA-3), mismo reloj (216MHz) y misma medición (TIM5), pero mide `libm` y
+CMSIS-DSP lado a lado en cada caso. Requiere un paso manual en Keil antes de compilar (`Project >
+Manage Run-Time Environment > CMSIS`, marcar `DSP`) — no se editó esto a mano en el `.uvprojx`
+porque la versión exacta de la librería depende del pack instalado en cada máquina.
+
+**Pendiente:** compilar, correr en la tarjeta real, y comparar contra los tiempos de las
+secciones 9-10. Esta sección se va a actualizar con los datos medidos — por ahora es una
+descripción del experimento, no un resultado.
