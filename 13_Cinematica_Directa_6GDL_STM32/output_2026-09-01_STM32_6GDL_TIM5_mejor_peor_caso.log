@@ -1,0 +1,77 @@
+=== Cinematica Directa 6 GDL real -- STM32F767ZI @ 216MHz (TIM5) ===
+Presiona el boton de usuario (B1) para repetir las 3 pruebas.
+
+=== Caso 1 [extendido] q=0 ===
+  entradas (grados): th1=0.0 th2=0.0 th3=0.0 th4=0.0 th5=0.0 th6=0.0
+  x=0.4200 m  y=-0.0000 m  z=0.0650 m
+  yaw=-90.00 deg  pitch=-0.00 deg  roll=-90.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 4692  (43.444 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 4163  (38.546 us)
+
+=== Caso 2 [SINGULARIDAD del 6R] th5=90 th6=90 ===
+  entradas (grados): th1=0.0 th2=0.0 th3=0.0 th4=0.0 th5=90.0 th6=90.0
+  x=0.2470 m  y=0.1730 m  z=0.0650 m
+  yaw=0.00 deg  pitch=90.00 deg  roll=180.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 4050  (37.500 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 4041  (37.417 us)
+
+=== Caso 3 [generico] ===
+  entradas (grados): th1=30.0 th2=20.0 th3=-15.0 th4=45.0 th5=60.0 th6=-70.0
+  x=0.2215 m  y=0.2502 m  z=0.2269 m
+  yaw=-42.50 deg  pitch=-34.56 deg  roll=-37.47 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 5542  (51.315 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 5501  (50.935 us)
+
+=== Caso EXTRA-1 [MEJOR CASO: los 6 angulos en 90 grados] ===
+  entradas (grados): th1=90.0 th2=90.0 th3=90.0 th4=90.0 th5=90.0 th6=90.0
+  x=-0.0000 m  y=-0.1400 m  z=-0.0010 m
+  yaw=180.00 deg  pitch=-0.00 deg  roll=-180.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 4600  (42.593 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 4580  (42.407 us)
+
+=== Caso EXTRA-2 [PEOR CASO: angulos irregulares, dentro de 0-180] ===
+  entradas (grados): th1=137.6 th2=23.9 th3=168.2 th4=74.5 th5=109.3 th6=41.7
+  x=-0.0662 m  y=0.0014 m  z=-0.0629 m
+  yaw=-88.66 deg  pitch=11.91 deg  roll=146.93 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 5620  (52.037 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 5625  (52.083 us)
+
+
+=== Cinematica Directa 6 GDL real -- STM32F767ZI @ 16MHz (HSI, sin PLL, TIM5) ===
+Presiona el boton de usuario (B1) para repetir las 3 pruebas.
+
+=== Caso 1 [extendido] q=0 ===
+  entradas (grados): th1=0.0 th2=0.0 th3=0.0 th4=0.0 th5=0.0 th6=0.0
+  x=0.4200 m  y=-0.0000 m  z=0.0650 m
+  yaw=-90.00 deg  pitch=-0.00 deg  roll=-90.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 8759  (547.438 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 8330  (520.625 us)
+
+=== Caso 2 [SINGULARIDAD del 6R] th5=90 th6=90 ===
+  entradas (grados): th1=0.0 th2=0.0 th3=0.0 th4=0.0 th5=90.0 th6=90.0
+  x=0.2470 m  y=0.1730 m  z=0.0650 m
+  yaw=0.00 deg  pitch=90.00 deg  roll=180.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 8099  (506.188 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 8088  (505.500 us)
+
+=== Caso 3 [generico] ===
+  entradas (grados): th1=30.0 th2=20.0 th3=-15.0 th4=45.0 th5=60.0 th6=-70.0
+  x=0.2215 m  y=0.2502 m  z=0.2269 m
+  yaw=-42.50 deg  pitch=-34.56 deg  roll=-37.47 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 11026  (689.125 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 11008  (688.000 us)
+
+=== Caso EXTRA-1 [MEJOR CASO: los 6 angulos en 90 grados] ===
+  entradas (grados): th1=90.0 th2=90.0 th3=90.0 th4=90.0 th5=90.0 th6=90.0
+  x=-0.0000 m  y=-0.1400 m  z=-0.0010 m
+  yaw=180.00 deg  pitch=-0.00 deg  roll=-180.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 9183  (573.938 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 9167  (572.938 us)
+
+=== Caso EXTRA-2 [PEOR CASO: angulos irregulares, dentro de 0-180] ===
+  entradas (grados): th1=137.6 th2=23.9 th3=168.2 th4=74.5 th5=109.3 th6=41.7
+  yaw=-88.66 deg  pitch=11.9... [CAPTURA INCOMPLETA -- se cerro la terminal
+  antes de leer roll y los ticks TIM5 de este ultimo caso. Pendiente repetir
+  esta corrida para completar el dato -- el patron de escalado 13.5x de los
+  otros 4 casos predice ~702-705 us de promedio, pero eso es una PREDICCION,
+  no una medicion real. No usar ese numero como dato confirmado.]

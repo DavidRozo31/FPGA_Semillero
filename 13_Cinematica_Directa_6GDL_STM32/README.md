@@ -24,6 +24,13 @@ preguntas distintas:
 > recursiva), sección 6 (TIM5) y sección 9 (un hallazgo nuevo sobre por qué el software, a
 > diferencia del CORDIC de la FPGA, no tarda lo mismo para cualquier ángulo).
 
+> **Tercera actualización (pedido de los profesores) — caracterizar mejor y peor caso:** se
+> agregaron dos casos de prueba dedicados para acotar el rango real de tiempo de
+> `forward_kinematics()`, dentro del rango físico real de un servomotor (0°-180°): un "mejor caso"
+> (los 6 ángulos en 90°) y un "peor caso" (ángulos irregulares, lejos de cualquier múltiplo de 90°,
+> que fuerzan al máximo la reducción de rango de `cos()/sin()`). Ver sección 8 (log actualizado),
+> sección 9 (hallazgo 4) y la nueva sección 10 con el mínimo y máximo confirmados por reloj.
+
 > **Plataforma:** STM32F767ZI en Nucleo-144 (Cortex-M7, FPU doble precisión) · Keil µVision5
 > **Estilo:** 100% a registro (`RCC->...`, `GPIOD->...`), sin HAL ni LL — mismo estilo que el
 > resto de proyectos STM32 del semillero.
@@ -45,8 +52,9 @@ preguntas distintas:
 7. [Cómo se mide: "en frío" vs. promedio de 1000](#7-cómo-se-mide-en-frío-vs-promedio-de-1000)
 8. [La salida real del UART](#8-la-salida-real-del-uart)
 9. [Análisis de los resultados](#9-análisis-de-los-resultados)
-10. [FPGA vs. STM32 — la comparación final](#10-fpga-vs-stm32--la-comparación-final)
-11. [Cómo compilar y correr en Keil](#11-cómo-compilar-y-correr-en-keil)
+10. [Mínimo y máximo medido, por reloj](#10-mínimo-y-máximo-medido-por-reloj)
+11. [FPGA vs. STM32 — la comparación final](#11-fpga-vs-stm32--la-comparación-final)
+12. [Cómo compilar y correr en Keil](#12-cómo-compilar-y-correr-en-keil)
 
 ---
 
@@ -363,8 +371,10 @@ el mismo que pidió el profesor para el ejemplo de I2C con TIM5):
 
 Log completo capturado por HTerm, en las dos velocidades, con el botón de usuario presionado
 varias veces para confirmar que los resultados son estables entre corridas — archivo completo en
-[`output_2026-08-19_STM32_6GDL_TIM5_posicion_recursiva.log`](output_2026-08-19_STM32_6GDL_TIM5_posicion_recursiva.log).
-Extracto (una corrida de cada velocidad):
+[`output_2026-08-19_STM32_6GDL_TIM5_posicion_recursiva.log`](output_2026-08-19_STM32_6GDL_TIM5_posicion_recursiva.log)
+(3 casos originales) y, con los dos casos EXTRA agregados después, en
+[`output_2026-09-01_STM32_6GDL_TIM5_mejor_peor_caso.log`](output_2026-09-01_STM32_6GDL_TIM5_mejor_peor_caso.log).
+Extracto (una corrida de cada velocidad, los 5 casos):
 
 ```
 === Cinematica Directa 6 GDL real -- STM32F767ZI @ 216MHz (TIM5) ===
@@ -390,6 +400,20 @@ Extracto (una corrida de cada velocidad):
   ticks TIM5 (1 ejecucion, en frio)    = 5556  (51.444 us)
   ticks TIM5 (promedio 1000 ejecuciones) = 5514  (51.056 us)
 
+=== Caso EXTRA-1 [MEJOR CASO: los 6 angulos en 90 grados] ===
+  entradas (grados): th1=90.0 th2=90.0 th3=90.0 th4=90.0 th5=90.0 th6=90.0
+  x=-0.0000 m  y=-0.1400 m  z=-0.0010 m
+  yaw=180.00 deg  pitch=-0.00 deg  roll=-180.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 4600  (42.593 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 4580  (42.407 us)
+
+=== Caso EXTRA-2 [PEOR CASO: angulos irregulares, dentro de 0-180] ===
+  entradas (grados): th1=137.6 th2=23.9 th3=168.2 th4=74.5 th5=109.3 th6=41.7
+  x=-0.0662 m  y=0.0014 m  z=-0.0629 m
+  yaw=-88.66 deg  pitch=11.91 deg  roll=146.93 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 5620  (52.037 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 5625  (52.083 us)
+
 
 === Cinematica Directa 6 GDL real -- STM32F767ZI @ 16MHz (HSI, sin PLL, TIM5) ===
 
@@ -411,14 +435,29 @@ Extracto (una corrida de cada velocidad):
   entradas (grados): th1=30.0 th2=20.0 th3=-15.0 th4=45.0 th5=60.0 th6=-70.0
   x=0.2215 m  y=0.2502 m  z=0.2269 m
   yaw=-42.50 deg  pitch=-34.56 deg  roll=-37.47 deg
-  ticks TIM5 (1 ejecucion, en frio)    = 11023  (688.938 us)
-  ticks TIM5 (promedio 1000 ejecuciones) = 11000  (687.500 us)
+  ticks TIM5 (1 ejecucion, en frio)    = 11026  (689.125 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 11008  (688.000 us)
+
+=== Caso EXTRA-1 [MEJOR CASO: los 6 angulos en 90 grados] ===
+  entradas (grados): th1=90.0 th2=90.0 th3=90.0 th4=90.0 th5=90.0 th6=90.0
+  x=-0.0000 m  y=-0.1400 m  z=-0.0010 m
+  yaw=180.00 deg  pitch=-0.00 deg  roll=-180.00 deg
+  ticks TIM5 (1 ejecucion, en frio)    = 9183  (573.938 us)
+  ticks TIM5 (promedio 1000 ejecuciones) = 9167  (572.938 us)
+
+=== Caso EXTRA-2 [PEOR CASO: angulos irregulares, dentro de 0-180] ===
+  entradas (grados): th1=137.6 th2=23.9 th3=168.2 th4=74.5 th5=109.3 th6=41.7
+  [CAPTURA INCOMPLETA -- pendiente repetir esta corrida puntual para
+   confirmar roll y los ticks TIM5 de este ultimo caso a 16MHz]
 ```
 
 Posición y orientación coincidieron **exactas** con lo esperado (misma verificación que la
 [tabla de la lección 12, sección 7](../12_Cinematica_Directa_6GDL/README.md#7-verificación-modelsim-y-matlab)),
 en las dos velocidades, en varias corridas repetidas — confirma que el puerto a C del método
-recursivo está bien hecho, independiente del reloj.
+recursivo está bien hecho, independiente del reloj. La única excepción es el dato de tiempo del
+Caso EXTRA-2 a 16MHz, cuya captura por terminal se cortó a la mitad (ver sección 10) — no afecta
+la validación de posición/orientación, que ya estaba confirmada en los otros 4 casos y en la
+corrida a 216MHz.
 
 ---
 
@@ -484,17 +523,74 @@ diferencia (~32% aquí) hay que medirla empíricamente probando muchas combinaci
 porque no se puede leer del código fuente ni de la hoja de datos del chip — el software no tiene
 un "peor caso" fácil de acotar, el hardware dedicado sí.
 
+**Hallazgo 4 — el "mejor caso" diseñado a propósito NO es el más rápido; ganó la rama de
+singularidad, no los ángulos limpios.** Para acotar el rango real de tiempo, se agregaron dos
+casos dedicados: Caso EXTRA-1 (los 6 ángulos en 90°, pensado como el mejor caso posible para la
+CPU) y Caso EXTRA-2 (ángulos irregulares dentro de 0°-180°, el peor caso realista). El resultado
+en los dos relojes:
+
+| Caso | 216MHz, promedio (µs) | 16MHz, promedio (µs) |
+|---|---|---|
+| 2 — singularidad | **37.417** (el más rápido) | **505.500** (el más rápido) |
+| EXTRA-1 — los 6 ángulos en 90° | 42.407 | 572.938 |
+| EXTRA-2 — irregular (peor caso) | **52.083** (el más lento) | ≥688.000 (ver sección 10) |
+
+El Caso EXTRA-1 sí es más rápido que el Caso 3 (genérico) y que el EXTRA-2, confirmando la
+hipótesis del Hallazgo 3 (ángulos "limpios" toman la ruta corta de `cos()`/`sin()`). Pero el Caso
+2 le sigue ganando por un margen claro y repetible en los dos relojes (~13% más rápido que
+EXTRA-1). La razón está en el código, no en la trigonometría: el Caso 2 cae en la rama
+`if (mag < EPS_SINGULARIDAD)` de la sección 4.3, que **asigna** `yaw=0.0` y `roll=PI` directo,
+sin llamar `atan2()` ni una sola vez — mientras que el Caso EXTRA-1, aunque tiene los ángulos más
+"baratos" posibles para `cos()`/`sin()`, sigue teniendo que llamar `atan2()` dos veces (para
+`yaw` y `roll`) porque no cae en la singularidad. Ahorrarse dos llamadas a función completas pesa
+más que tomar la ruta rápida dentro de esas llamadas — una distinción que no era obvia antes de
+medir con un caso diseñado específicamente para aislarla.
+
 ---
 
-## 10. FPGA vs. STM32 — la comparación final
+## 10. Mínimo y máximo medido, por reloj
+
+Con los 5 casos de prueba corridos (los 3 originales de la lección 12 más los 2 casos EXTRA de
+la sección 9, pedidos explícitamente para acotar el rango real de tiempo dentro del espacio de
+ángulos físicamente alcanzable por el brazo, 0°-180°), estos son los extremos medidos —
+`forward_kinematics()`, promedio de 1000 ejecuciones (estado estable, ver sección 7):
+
+| Reloj | Mínimo | Configuración | Máximo | Configuración |
+|---|---|---|---|---|
+| **216 MHz** (PLL, Over-drive) | **37.417 µs** | Caso 2 — singularidad (th5=90°, th6=90°, resto 0°) | **52.083 µs** | Caso EXTRA-2 — peor caso (ángulos irregulares, ver sección 9) |
+| **16 MHz** (HSI, sin PLL) | **505.500 µs** | Caso 2 — singularidad (misma configuración) | **688.000 µs** confirmado (Caso 3 — genérico) | ver nota |
+
+> **Nota sobre el máximo a 16MHz:** el Caso EXTRA-2 (diseñado como el peor caso) fue efectivamente
+> el más lento a 216MHz (52.083 µs, un 2.3% más que el Caso 3), así que por el mismo patrón
+> probablemente también sea el máximo real a 16MHz — pero su captura por terminal a 16MHz se
+> cortó antes de leer el dato completo de tiempo (ver sección 8). Usando el factor de escalado
+> 13.5× confirmado en los otros 4 casos (sección 9, Hallazgo 1), el valor esperado ronda
+> **~702-705 µs** — esto es una **predicción, no una medición**, y se deja así de explícito hasta
+> repetir esa corrida puntual. El máximo **confirmado por medición completa** a 16MHz es el
+> Caso 3, con 688.000 µs.
+
+En "en frío" (una sola ejecución, sin caché caliente — sección 7) el orden de mínimo/máximo es el
+mismo: 37.500 µs / 52.037 µs a 216MHz, y 506.188 µs / 689.125 µs (Caso 3, confirmado) a 16MHz —
+la diferencia entre "en frío" y "promedio" es marginal en estos dos casos porque para cuando se
+ejecutan (van 2° y 5° en `run_all_cases()`) la caché ya se calentó con las 1000 repeticiones del
+Caso 1 (ver Hallazgo 2, sección 9).
+
+**Rango total medido:** a 216MHz el peor caso tarda **39% más** que el mejor (52.083 vs 37.417
+µs); a 16MHz, al menos **36% más** (688.000 vs 505.500 µs, y probablemente más si se confirma el
+EXTRA-2). Es el mismo orden de magnitud en las dos velocidades — coherente con el Hallazgo 1
+(el costo, en ciclos de CPU, no depende del reloj, solo el tiempo real).
+
+---
+
+## 11. FPGA vs. STM32 — la comparación final
 
 | | FPGA (50 MHz) | STM32 @ 216 MHz | STM32 @ 16 MHz |
 |---|---|---|---|
-| Tiempo | **~4.05 µs, siempre** (fijo, cualquier ángulo) | 37.5–51.4 µs (según el ángulo) | 505.3–688.9 µs (según el ángulo) |
-| **Veces más lento que la FPGA** | 1× | **~9.3×–12.7×** | **~124.8×–170.1×** |
+| Tiempo | **~4.05 µs, siempre** (fijo, cualquier ángulo) | 37.4–52.1 µs (según el ángulo, rango confirmado, sección 10) | 505.5–688.0 µs confirmado (posiblemente ~705 µs, sección 10) |
+| **Veces más lento que la FPGA** | 1× | **~9.2×–12.9×** | **~124.8×–169.9×** (hasta ~174× si se confirma el máximo) |
 
 A pesar de que el STM32 a máxima velocidad tiene un reloj **4.3 veces más rápido** que la FPGA
-(216MHz vs 50MHz), termina el mismo cálculo entre **~9.3 y 12.7 veces más lento** — el mismo
+(216MHz vs 50MHz), termina el mismo cálculo entre **~9.2 y 12.9 veces más lento** — el mismo
 patrón que ya se había visto con el brazo de 5R: hardware dedicado en pipeline (la FPGA calcula
 todo en paralelo, ciclo a ciclo, con circuitos construidos exactamente para esta cuenta) le gana
 por mucho a software secuencial (el STM32 ejecuta instrucción por instrucción, y cada
@@ -512,7 +608,7 @@ velocidad, gana en **previsibilidad**, una propiedad aparte y clave para control
 
 ---
 
-## 11. Cómo compilar y correr en Keil
+## 12. Cómo compilar y correr en Keil
 
 1. Abrir `FK_6R_Geometrico_STM32.uvprojx` (216MHz) o
    `FK_6R_Geometrico_STM32_HSI16MHz.uvprojx` (16MHz) en Keil µVision5 — son dos proyectos
