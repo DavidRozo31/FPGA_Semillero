@@ -29,6 +29,7 @@ paso hace todo ~25-31% más rápido — mejora, pero no iguala la previsibilidad
 6. [Por qué varía el tiempo en software (y no en la FPGA)](#6-por-qué-varía-el-tiempo-en-software-y-no-en-la-fpga)
 7. [FPGA vs. STM32 — comparación final](#7-fpga-vs-stm32--comparación-final)
 8. [¿Existe una librería con tiempo constante? — libm vs. CMSIS-DSP](#8-existe-una-librería-con-tiempo-constante--libm-vs-cmsis-dsp)
+   - 8.1 Por qué ninguna de las dos es constante (la causa de fondo)
 9. [Cómo compilar y correr](#9-cómo-compilar-y-correr)
 
 ---
@@ -215,6 +216,51 @@ solo que con una diferencia relativa menor entre las dos rutas, y partiendo de u
 rápida en las dos. Posición y orientación coinciden entre las dos versiones con diferencias
 mínimas (~0.0001 m, ~0.01°), esperadas por la precisión simple (`float`) de CMSIS-DSP contra
 doble precisión (`double`) de libm.
+
+### 8.1 Por qué ninguna de las dos es constante (la causa de fondo)
+
+Las dos librerías son rápidas *en promedio* precisamente porque **toman atajos quando el ángulo
+lo permite** — y un atajo, por definición, es una rama de código que no siempre se ejecuta. Esa
+es la razón de fondo, la misma para las dos, aunque el atajo concreto sea distinto:
+
+**`cos()`/`sin()` de `<math.h>` (libm, reducción de rango + polinomio):**
+1. Para calcular `sin(x)`/`cos(x)` de un `x` cualquiera, primero hay que saber en qué "vuelta" del
+   círculo cae — se calcula `n = round(x · 2/π)` y se resta `n·(π/2)` para llevar `x` a un rango
+   chiquito (`[-π/4, π/4]`) antes de evaluar el polinomio de aproximación.
+2. Si `x` ya es chiquito (como `0`), esa reducción es trivial o se salta por completo — la
+   librería detecta que no hace falta y devuelve el resultado casi gratis.
+3. Si `x` es un ángulo genérico (como los del Caso 3), el cálculo de `n` necesita más precisión
+   extra para no perder exactitud (algoritmos tipo Cody-Waite/Payne-Hanek), y según el valor de
+   `n mod 4` hay que decidir si evaluar el polinomio de seno o de coseno y con qué signo — **una
+   decisión (rama) que depende del valor de entrada**, no solo un cálculo numérico.
+
+**`arm_sin_f32()`/`arm_cos_f32()` de CMSIS-DSP (tabla + interpolación):**
+1. En vez de un polinomio, usa una tabla de valores precalculados a lo largo de un ciclo completo
+   y hace interpolación lineal entre los dos valores de tabla más cercanos al ángulo pedido.
+2. Para saber qué posición de la tabla usar, primero hay que **normalizar** el ángulo de entrada
+   a una sola vuelta (`[0, 2π)` o equivalente) — eso es un módulo/envolvente.
+3. Ese paso de normalización es barato si el ángulo ya está cerca de esa vuelta base (como los
+   ángulos "limpios" del Caso 1/2/EXTRA-1/EXTRA-3), y más caro si hay que reducir varias vueltas o
+   el valor cae en un punto que exige más precisión de conversión (como los ángulos genéricos del
+   Caso 3/EXTRA-2) — la tabla+interpolación en sí es rápida y pareja, pero el paso previo de
+   normalización **no lo es**, y por eso el patrón de dos grupos (sección 8) se parece tanto al de
+   libm, aunque la diferencia entre grupos sea menor.
+
+**El punto común:** cualquier función que intente ser *rápida en el caso típico* necesita alguna
+forma de "mirar" el valor de entrada y decidir cuánto trabajo hacer — eso es exactamente lo que
+el CORDIC de la FPGA (`cordic_sincos_16.vhd`, lección 12) **no hace**: itera un número fijo de
+veces (`N_ITER=12`) sin importar el ángulo, nunca pregunta "¿qué tan difícil es esto?". Ganar en
+velocidad promedio y ganar en tiempo constante son objetivos de diseño que se contraponen — una
+librería de software no puede tener las dos cosas a la vez sin dejar de ser una librería de
+propósito general.
+
+**¿Existe alguna forma de lograr tiempo constante en el STM32?** Sí, pero no con una librería ya
+hecha: escribiendo un CORDIC en software propio, con un bucle de iteraciones fijas y sin ninguna
+rama condicionada al valor del ángulo — el mismo principio del CORDIC de la FPGA, portado a C. El
+F767 no trae el periférico CORDIC de hardware que sí tienen los STM32G4/U5 más nuevos, así que la
+única manera de tener esa garantía aquí es replicar el algoritmo en software puro (a costa de ser
+más lento que `libm`/CMSIS-DSP, que sí aprovechan la FPU). No implementado todavía en este
+proyecto — candidato a una próxima lección si se quiere cerrar la comparación de raíz.
 
 > **Nota de depuración (por si se repite):** la primera versión de este experimento agregó
 > CMSIS-DSP como librería precompilada ("Library" en Manage Run-Time Environment) y causaba un
