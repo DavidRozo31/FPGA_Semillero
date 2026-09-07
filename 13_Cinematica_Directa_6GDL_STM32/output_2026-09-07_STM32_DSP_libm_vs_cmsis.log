@@ -1,0 +1,58 @@
+=== FK_6R_Geometrico_STM32_DSP -- libm vs CMSIS-DSP (TIM5, 216MHz) ===
+
+--- DIAGNOSTICO CMSIS-DSP (Caso 2: theta5=90, theta6=90) ---
+DIAG 1 OK -- arm_sin_f32(90)=1.000000 arm_cos_f32(90)=0.000000
+DIAG 2 OK -- arm_sin_f32(90)=1.000000 arm_cos_f32(90)=0.000000 (theta6)
+DIAG 3 OK -- dh_rot_cmsis(R5) hecha, R5[0][0]=0.0000
+DIAG 4 OK -- dh_rot_cmsis(R6) hecha, R6[0][0]=0.0000
+DIAG 5 OK -- forward_kinematics_cmsis(Caso2) completa: x=0.2470 y=0.1730 z=0.0650
+--- DIAGNOSTICO TERMINADO SIN CUELGUE ---
+
+Presiona el boton de usuario (B1) para repetir los 6 casos.
+
+=== Caso 1 [extendido] q=0 ===
+  entradas (grados): th1=0.0 th2=0.0 th3=0.0 th4=0.0 th5=0.0 th6=0.0
+  [libm]      x=0.4200 y=-0.0000 z=0.0650  yaw=-90.00 pitch=-0.00 roll=-90.00
+  [CMSIS-DSP] x=0.4200 y=0.0000 z=0.0650  yaw=-90.00 pitch=-0.00 roll=-90.00
+  [libm]      ticks TIM5 (en frio) = 4432 (41.037 us)   (promedio 1000) = 4157 (38.491 us)
+  [CMSIS-DSP] ticks TIM5 (en frio) = 3136 (29.037 us)   (promedio 1000) = 3116 (28.852 us)
+
+=== Caso 2 [SINGULARIDAD del 6R] th5=90 th6=90 ===
+  entradas (grados): th1=0.0 th2=0.0 th3=0.0 th4=0.0 th5=90.0 th6=90.0
+  [libm]      x=0.2470 y=0.1730 z=0.0650  yaw=0.00 pitch=90.00 roll=180.00
+  [CMSIS-DSP] x=0.2470 y=0.1730 z=0.0650  yaw=0.00 pitch=90.00 roll=180.00
+  [libm]      ticks TIM5 (en frio) = 4054 (37.537 us)   (promedio 1000) = 4047 (37.472 us)
+  [CMSIS-DSP] ticks TIM5 (en frio) = 3020 (27.963 us)   (promedio 1000) = 2988 (27.667 us)
+
+=== Caso 3 [generico] ===
+  entradas (grados): th1=30.0 th2=20.0 th3=-15.0 th4=45.0 th5=60.0 th6=-70.0
+  [libm]      x=0.2215 y=0.2502 z=0.2269  yaw=-42.50 pitch=-34.56 roll=-37.47
+  [CMSIS-DSP] x=0.2215 y=0.2502 z=0.2269  yaw=-42.50 pitch=-34.56 roll=-37.47
+  [libm]      ticks TIM5 (en frio) = 5544 (51.333 us)   (promedio 1000) = 5504 (50.963 us)
+  [CMSIS-DSP] ticks TIM5 (en frio) = 3984 (36.889 us)   (promedio 1000) = 3878 (35.907 us)
+
+=== Caso EXTRA-1 [MEJOR CASO 'a ojo'] ===
+  entradas (grados): th1=90.0 th2=90.0 th3=90.0 th4=90.0 th5=90.0 th6=90.0
+  [libm]      x=-0.0000 y=-0.1400 z=-0.0010  yaw=180.00 pitch=-0.00 roll=-180.00
+  [CMSIS-DSP] x=0.0000 y=-0.1400 z=-0.0010  yaw=180.00 pitch=-0.00 roll=180.00
+  [libm]      ticks TIM5 (en frio) = 4608 (42.667 us)   (promedio 1000) = 4586 (42.463 us)
+  [CMSIS-DSP] ticks TIM5 (en frio) = 3228 (29.889 us)   (promedio 1000) = 3224 (29.852 us)
+
+=== Caso EXTRA-2 [PEOR CASO] ===
+  entradas (grados): th1=137.6 th2=23.9 th3=168.2 th4=74.5 th5=109.3 th6=41.7
+  [libm]      x=-0.0662 y=0.0014 z=-0.0629  yaw=-88.66 pitch=11.91 roll=146.93
+  [CMSIS-DSP] x=-0.0662 y=0.0014 z=-0.0628  yaw=-88.67 pitch=11.91 roll=146.93
+  [libm]      ticks TIM5 (en frio) = 5624 (52.074 us)   (promedio 1000) = 5615 (51.991 us)
+  [CMSIS-DSP] ticks TIM5 (en frio) = 3902 (36.130 us)   (promedio 1000) = 3853 (35.676 us)
+
+=== Caso EXTRA-3 [MEJOR CASO REAL] ===
+  entradas (grados): th1=0.0 th2=0.0 th3=-90.0 th4=-90.0 th5=90.0 th6=0.0
+  [libm]      x=-0.0660 y=-0.0000 z=-0.0750  yaw=0.00 pitch=90.00 roll=180.00
+  [CMSIS-DSP] x=-0.0660 y=0.0000 z=-0.0750  yaw=0.00 pitch=90.00 roll=180.00
+  [libm]      ticks TIM5 (en frio) = 3800 (35.185 us)   (promedio 1000) = 3786 (35.056 us)
+  [CMSIS-DSP] ticks TIM5 (en frio) = 3024 (28.000 us)   (promedio 1000) = 2991 (27.694 us)
+
+(Corrida repetida 2 veces consecutivas -- numeros identicos, confirma
+estabilidad. Corrido en una segunda tarjeta Nucleo-144 fisica -- la primera
+presento fallas de hardware ajenas al codigo, descartadas corriendo el
+mismo binario del proyecto original en las dos tarjetas.)

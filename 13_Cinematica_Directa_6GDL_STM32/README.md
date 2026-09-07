@@ -11,6 +11,8 @@ más rápido es hardware dedicado (FPGA) que software en un microcontrolador rá
 **Conclusión corta:** el STM32 a su velocidad máxima es entre **8.6× y 12.8× más lento** que la
 FPGA según el ángulo de entrada (la FPGA no varía, el STM32 sí — hasta 49% entre el mejor y el
 peor caso). Bajar el STM32 a su reloj de fábrica (16 MHz) multiplica esa brecha otras ~13.5×.
+Cambiar `<math.h>` por la librería CMSIS-DSP (sección 8) reduce esa variación de 48% a 30% y de
+paso hace todo ~25-31% más rápido — mejora, pero no iguala la previsibilidad de la FPGA.
 
 > **Plataforma:** STM32F767ZI en Nucleo-144 (Cortex-M7, FPU doble precisión) · Keil µVision5,
 > estilo 100% a registro (`RCC->...`, sin HAL/LL). **Universidad Militar Nueva Granada.**
@@ -26,7 +28,7 @@ peor caso). Bajar el STM32 a su reloj de fábrica (16 MHz) multiplica esa brecha
 5. [Resultados — los 6 casos, las 2 velocidades](#5-resultados--los-6-casos-las-2-velocidades)
 6. [Por qué varía el tiempo en software (y no en la FPGA)](#6-por-qué-varía-el-tiempo-en-software-y-no-en-la-fpga)
 7. [FPGA vs. STM32 — comparación final](#7-fpga-vs-stm32--comparación-final)
-8. [Experimento en curso: CMSIS-DSP](#8-experimento-en-curso-cmsis-dsp)
+8. [¿Existe una librería con tiempo constante? — libm vs. CMSIS-DSP](#8-existe-una-librería-con-tiempo-constante--libm-vs-cmsis-dsp)
 9. [Cómo compilar y correr](#9-cómo-compilar-y-correr)
 
 ---
@@ -185,27 +187,57 @@ software.
 
 ---
 
-## 8. Experimento en curso: CMSIS-DSP
+## 8. ¿Existe una librería con tiempo constante? — libm vs. CMSIS-DSP
 
-Pregunta de los profesores: ¿existe una librería que dé tiempo **constante** sin importar el
-ángulo (a diferencia del Hallazgo 3)? Candidata: **CMSIS-DSP** (`arm_sin_f32`/`arm_cos_f32`,
-tabla + interpolación en `float` en vez de reducción de rango en `double`).
-
+Pregunta de los profesores a partir del Hallazgo 3: ¿existe una librería para STM32 que dé un
+tiempo más estable sin importar el ángulo? Candidata: **CMSIS-DSP** (`arm_sin_f32`/`arm_cos_f32`,
+tabla + interpolación en `float`, en vez de la reducción de rango en `double` de `<math.h>`).
 Proyecto separado (no toca el `.cpp` ya validado):
-[`FK_6R_Geometrico_STM32_CMSIS/`](FK_6R_Geometrico_STM32_CMSIS/).
+[`FK_6R_Geometrico_STM32_DSP/`](FK_6R_Geometrico_STM32_DSP/) — mismos 6 casos, calcula las dos
+versiones lado a lado en cada uno. Log completo:
+[`output_2026-09-07_STM32_DSP_libm_vs_cmsis.log`](output_2026-09-07_STM32_DSP_libm_vs_cmsis.log).
 
-**Estado: en debugging.** El chip se reinicia en bucle (HardFault) al calcular el Caso 2 con
-CMSIS-DSP — el primer ángulo de 90° que se le pasa a `arm_sin_f32`/`arm_cos_f32` en todo el
-programa. Sospechas en orden de probabilidad: (1) variante de librería CMSIS-DSP mal emparejada
-con el FPU al agregarla vía Manage Run-Time Environment, (2) caso límite real de la tabla en
-π/2 exacto. Esta sección se actualiza con la causa raíz y los datos reales cuando se resuelva.
+| Caso | libm (µs) | CMSIS-DSP (µs) | CMSIS-DSP más rápido por |
+|---|---|---|---|
+| 1 — extendido | 38.491 | 28.852 | 25.0% |
+| 2 — singularidad | 37.472 | **27.667 (mín)** | 26.2% |
+| 3 — genérico | 50.963 | **35.907 (máx)** | 29.5% |
+| EXTRA-1 — "mejor" a ojo | 42.463 | 29.852 | 29.7% |
+| EXTRA-2 — peor caso | 51.991 | 35.676 | 31.4% |
+| EXTRA-3 — mejor caso real | 35.056 | 27.694 | 21.0% |
+
+**Respuesta: no, tampoco es constante — pero varía bastante menos que libm y siempre es más
+rápida.** Rango peor/mejor caso: libm 48.3% (51.991/35.056), CMSIS-DSP 29.8% (35.907/27.667).
+Los 6 casos de CMSIS-DSP caen en dos grupos bien definidos: Caso 1, Caso 2, EXTRA-1 y EXTRA-3
+(ángulos "limpios" o la singularidad) rondan 27.7-29.9 µs; Caso 3 y EXTRA-2 (ángulos genéricos)
+saltan a 35.7-35.9 µs — el mismo fenómeno del Hallazgo 3 (ruta rápida/lenta según el ángulo),
+solo que con una diferencia relativa menor entre las dos rutas, y partiendo de una base más
+rápida en las dos. Posición y orientación coinciden entre las dos versiones con diferencias
+mínimas (~0.0001 m, ~0.01°), esperadas por la precisión simple (`float`) de CMSIS-DSP contra
+doble precisión (`double`) de libm.
+
+> **Nota de depuración (por si se repite):** la primera versión de este experimento agregó
+> CMSIS-DSP como librería precompilada ("Library" en Manage Run-Time Environment) y causaba un
+> HardFault en bucle al primer ángulo de 90° — síntoma de una librería mal emparejada con el FPU
+> del F767. Se resolvió recreando el proyecto desde cero y eligiendo la variante **"Source"**
+> (compila el código de CMSIS-DSP junto con el resto del proyecto, con las mismas banderas de
+> compilador — elimina cualquier mismatch de ABI/FPU). También se subió `Stack_Size` de
+> `0x400` a `0x10000` en `startup_stm32f767xx.s`, porque `run_test_case()` ahora sostiene el
+> doble de matrices (`forward_kinematics()` + `forward_kinematics_cmsis()` a la vez).
 
 ---
 
 ## 9. Cómo compilar y correr
 
-1. Abrir `FK_6R_Geometrico_STM32.uvprojx` (216MHz) o `FK_6R_Geometrico_STM32_HSI16MHz.uvprojx`
-   (16MHz) en Keil µVision5 — mismo target `STM32F767ZITx`.
+1. Abrir `FK_6R_Geometrico_STM32.uvprojx` (216MHz), `FK_6R_Geometrico_STM32_HSI16MHz.uvprojx`
+   (16MHz), o `FK_6R_Geometrico_STM32_DSP/FK_6R_Geometrico_STM32_DSP.uvprojx` (libm vs
+   CMSIS-DSP, sección 8) en Keil µVision5 — mismo target `STM32F767ZITx` los tres.
 2. `Build` (F7) y `Download` (Ctrl+F5), con el ST-LINK de la Nucleo-144 conectado.
 3. Terminal serie (HTerm/PuTTY) al puerto COM del ST-LINK, 9600 baudios, 8N1.
 4. Al resetear corre `run_all_cases()` una vez — el botón de usuario (B1) lo repite.
+
+> Si el chip se reinicia solo en bucle sin razón aparente (banner repetido, datos corruptos a
+> mitad de línea) y **no** coincide con ningún cambio de código reciente, antes de sospechar del
+> firmware prueba el mismo `.hex` en otra tarjeta Nucleo-144 física — puede ser un problema de
+> hardware/alimentación de esa tarjeta puntual, no del programa (nos pasó exactamente así con
+> el experimento de la sección 8).
