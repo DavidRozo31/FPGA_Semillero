@@ -49,10 +49,10 @@
             <InvalidFlash>1</InvalidFlash>
           </TargetStatus>
           <OutputDirectory>.\Objects\</OutputDirectory>
-          <OutputName>FK_6R_Geometrico_STM32_CMSIS</OutputName>
+          <OutputName>FK_6R_Geometrico_STM32_DSP</OutputName>
           <CreateExecutable>1</CreateExecutable>
           <CreateLib>0</CreateLib>
-          <CreateHexFile>1</CreateHexFile>
+          <CreateHexFile>0</CreateHexFile>
           <DebugInformation>1</DebugInformation>
           <BrowseInformation>1</BrowseInformation>
           <ListingPath>.\Listings\</ListingPath>
@@ -134,11 +134,11 @@
             <RunIndependent>0</RunIndependent>
             <UpdateFlashBeforeDebugging>1</UpdateFlashBeforeDebugging>
             <Capability>1</Capability>
-            <DriverSelection>4096</DriverSelection>
+            <DriverSelection>-1</DriverSelection>
           </Flash1>
           <bUseTDR>1</bUseTDR>
           <Flash2>BIN\UL2CM3.DLL</Flash2>
-          <Flash3>"" ()</Flash3>
+          <Flash3></Flash3>
           <Flash4></Flash4>
           <pFcarmOut></pFcarmOut>
           <pFcarmGrp></pFcarmGrp>
@@ -384,9 +384,9 @@
           <GroupName>Source Group 1</GroupName>
           <Files>
             <File>
-              <FileName>FK_6R_Geometrico_STM32_CMSIS.cpp</FileName>
+              <FileName>FK_6R_Geometrico_STM32_DSP.cpp</FileName>
               <FileType>8</FileType>
-              <FilePath>.\FK_6R_Geometrico_STM32_CMSIS.cpp</FilePath>
+              <FilePath>.\FK_6R_Geometrico_STM32_DSP.cpp</FilePath>
             </File>
           </Files>
         </Group>
