@@ -175,16 +175,36 @@ diseñados para ello (como EXTRA-2/EXTRA-3 aquí).
 
 ---
 
-## 7. FPGA vs. STM32 — comparación final
+## 7. FPGA vs. STM32 — comparación final (los 6 casos, 3 formas de calcular lo mismo)
 
-| | FPGA (50 MHz) | STM32 @ 216 MHz | STM32 @ 16 MHz |
-|---|---|---|---|
-| Tiempo | **~4.05 µs, siempre** | 34.9 – 52.0 µs (según ángulo) | 471.4 – 702.4 µs (según ángulo) |
-| Veces más lento que la FPGA | 1× | **8.6× – 12.8×** | **116.4× – 173.4×** |
+El tiempo de la FPGA en esta tabla **ya no es una extrapolación** — se agregaron los 2 casos que
+faltaban (EXTRA-1 y EXTRA-3) al testbench de la lección 12
+([`tb.vhd`](../12_Cinematica_Directa_6GDL/tb.vhd), casos `CasoE`/`CasoF`) y se corrió ModelSim
+para los 6 casos completos: **203 ciclos hasta `done_out`, idénticos en los 6**, sin una sola
+diferencia — a 20 ns/ciclo (período del testbench) son **4.060 µs, constante**, confirmando el
+Hallazgo 1 con el propio hardware, no solo por diseño del algoritmo.
+
+| Caso | FPGA (µs) | libm (µs) | CMSIS-DSP (µs) | libm / FPGA | CMSIS-DSP / FPGA | CMSIS-DSP vs. libm |
+|---|---|---|---|---|---|---|
+| 1 — extendido | 4.060 | 38.491 | 28.852 | 9.48× | 7.11× | 25.0% más rápido |
+| 2 — singularidad | 4.060 | 37.472 | 27.667 | 9.23× | 6.81× (**mín**) | 26.2% más rápido |
+| 3 — genérico | 4.060 | 50.963 | 35.907 | 12.55× | 8.84× (**máx**) | 29.5% más rápido |
+| EXTRA-1 — "mejor" a ojo | 4.060 | 42.463 | 29.852 | 10.46× | 7.35× | 29.7% más rápido |
+| EXTRA-2 — peor caso | 4.060 | 51.991 | 35.676 | 12.81× (**máx**) | 8.79× | 31.4% más rápido |
+| EXTRA-3 — mejor caso real | 4.060 | 35.056 | 27.694 | 8.63× (**mín**) | 6.82× | 21.0% más rápido |
+
+**Lectura de la tabla:**
+- La FPGA es entre **8.6× y 12.8× más rápida** que libm, y entre **6.8× y 8.8× más rápida** que
+  CMSIS-DSP, según el ángulo — el rango de cada columna se explica solo por cuánto varía el
+  software (la FPGA en sí no varía nada, por eso la columna FPGA es una sola cifra).
+- CMSIS-DSP es consistentemente **21%-31% más rápido** que libm, pero sigue siendo entre 6.8× y
+  8.8× más lento que la FPGA — mejora la brecha, no la cierra.
+- Bajar el STM32 a 16 MHz (sección 5) multiplica *todas* las columnas STM32 por ~13.5×, sin
+  cambiar la columna FPGA en absoluto ni la relación entre libm y CMSIS-DSP.
 
 La FPGA no solo gana en velocidad — gana en **previsibilidad**: su tiempo no depende del ángulo
-de entrada, propiedad clave para control en tiempo real que ningún reloj de CPU compra en
-software.
+de entrada, propiedad clave para control en tiempo real que ninguna de las dos rutas de software
+logra igualar, ni siquiera la más rápida de las dos.
 
 ---
 
@@ -197,15 +217,7 @@ Proyecto separado (no toca el `.cpp` ya validado):
 [`FK_6R_Geometrico_STM32_DSP/`](FK_6R_Geometrico_STM32_DSP/) — mismos 6 casos, calcula las dos
 versiones lado a lado en cada uno. Log completo:
 [`output_2026-09-07_STM32_DSP_libm_vs_cmsis.log`](output_2026-09-07_STM32_DSP_libm_vs_cmsis.log).
-
-| Caso | libm (µs) | CMSIS-DSP (µs) | CMSIS-DSP más rápido por |
-|---|---|---|---|
-| 1 — extendido | 38.491 | 28.852 | 25.0% |
-| 2 — singularidad | 37.472 | **27.667 (mín)** | 26.2% |
-| 3 — genérico | 50.963 | **35.907 (máx)** | 29.5% |
-| EXTRA-1 — "mejor" a ojo | 42.463 | 29.852 | 29.7% |
-| EXTRA-2 — peor caso | 51.991 | 35.676 | 31.4% |
-| EXTRA-3 — mejor caso real | 35.056 | 27.694 | 21.0% |
+Tiempos completos de libm y CMSIS-DSP: ver la tabla de la sección 7 (ya incluye las dos).
 
 **Respuesta: no, tampoco es constante — pero varía bastante menos que libm y siempre es más
 rápida.** Rango peor/mejor caso: libm 48.3% (51.991/35.056), CMSIS-DSP 29.8% (35.907/27.667).
@@ -225,26 +237,53 @@ es la razón de fondo, la misma para las dos, aunque el atajo concreto sea disti
 
 **`cos()`/`sin()` de `<math.h>` (libm, reducción de rango + polinomio):**
 1. Para calcular `sin(x)`/`cos(x)` de un `x` cualquiera, primero hay que saber en qué "vuelta" del
-   círculo cae — se calcula `n = round(x · 2/π)` y se resta `n·(π/2)` para llevar `x` a un rango
-   chiquito (`[-π/4, π/4]`) antes de evaluar el polinomio de aproximación.
-2. Si `x` ya es chiquito (como `0`), esa reducción es trivial o se salta por completo — la
-   librería detecta que no hace falta y devuelve el resultado casi gratis.
-3. Si `x` es un ángulo genérico (como los del Caso 3), el cálculo de `n` necesita más precisión
-   extra para no perder exactitud (algoritmos tipo Cody-Waite/Payne-Hanek), y según el valor de
-   `n mod 4` hay que decidir si evaluar el polinomio de seno o de coseno y con qué signo — **una
-   decisión (rama) que depende del valor de entrada**, no solo un cálculo numérico.
+   círculo cae — se calcula `n = round(x · 2/π)` y se resta `n·(π/2)` para llevar `x` a un residuo
+   `r` chiquito (`[-π/4, π/4]`) antes de evaluar el polinomio de aproximación.
+2. Según el valor de `n mod 4`, una identidad trigonométrica decide si el resultado final se arma
+   con el polinomio de seno o el de coseno de `r`, y con qué signo — **una decisión (rama) que
+   depende del valor de entrada**, no solo un cálculo numérico.
+3. Si `r` sale exactamente `0` (ángulo de entrada múltiplo exacto de 90°), el polinomio se evalúa
+   sobre `0` — resultado casi inmediato. Si `r` es distinto de `0` (ángulo genérico), hay que
+   evaluar el polinomio completo sobre un valor real, con todas sus multiplicaciones y sumas.
 
-**`arm_sin_f32()`/`arm_cos_f32()` de CMSIS-DSP (tabla + interpolación):**
-1. En vez de un polinomio, usa una tabla de valores precalculados a lo largo de un ciclo completo
-   y hace interpolación lineal entre los dos valores de tabla más cercanos al ángulo pedido.
-2. Para saber qué posición de la tabla usar, primero hay que **normalizar** el ángulo de entrada
-   a una sola vuelta (`[0, 2π)` o equivalente) — eso es un módulo/envolvente.
-3. Ese paso de normalización es barato si el ángulo ya está cerca de esa vuelta base (como los
-   ángulos "limpios" del Caso 1/2/EXTRA-1/EXTRA-3), y más caro si hay que reducir varias vueltas o
-   el valor cae en un punto que exige más precisión de conversión (como los ángulos genéricos del
-   Caso 3/EXTRA-2) — la tabla+interpolación en sí es rápida y pareja, pero el paso previo de
-   normalización **no lo es**, y por eso el patrón de dos grupos (sección 8) se parece tanto al de
-   libm, aunque la diferencia entre grupos sea menor.
+   **Ejemplo numérico concreto** (ángulos hipotéticos, para ilustrar el mecanismo con números
+   reales — no son valores tomados literalmente del código):
+
+   | Paso | `x = 90°` (0.174533·9 = 1.570796 rad) | `x = 200°` (3.490659 rad) |
+   |---|---|---|
+   | `n = round(x·2/π)` | round(1.000000) = **1** | round(2.222222) = **2** |
+   | `r = x − n·(π/2)` | 1.570796 − 1×1.570796 = **0.000000 rad** | 3.490659 − 2×1.570796 = **0.349066 rad (20°)** |
+   | `n mod 4` → identidad | 1 → `sin(x) = cos(r)` | 2 → `sin(x) = −sin(r)` |
+   | Trabajo del polinomio | `cos(0)` → tabla trivial, ~0 multiplicaciones reales | `sin(20°)` real → el polinomio completo (varios términos, cada uno una multiplicación+suma) |
+   | Resultado | `sin(90°) = cos(0°) = 1.000000` ✓ | `sin(200°) = −sin(20°) = −0.342020` ✓ |
+
+   Los dos casos hacen la MISMA cantidad de pasos (calcular `n`, calcular `r`, elegir identidad,
+   evaluar polinomio) — la diferencia de tiempo real está en que, para `x=90°`, el paso final
+   "evaluar polinomio" recibe un `0` y termina casi al instante; para `x=200°`, recibe un `20°`
+   real y tiene que hacer el trabajo aritmético completo.
+
+**`arm_sin_f32()`/`arm_cos_f32()` de CMSIS-DSP (tabla de 512 valores + interpolación lineal —
+confirmado en la [documentación oficial de ARM](https://arm-software.github.io/CMSIS-DSP/latest/group__sin.html)):**
+1. El ángulo de entrada se normaliza a una fracción de una vuelta completa: `fraccion = x / (2π)`.
+2. Esa fracción se multiplica por el tamaño de la tabla (512): `indice = fraccion × 512`.
+3. Si `indice` cae **exactamente** en un entero, se lee un solo valor de tabla y ya. Si `indice`
+   cae **entre** dos posiciones de tabla (caso general), hay que leer las DOS posiciones vecinas
+   y hacer la interpolación lineal (una resta, una multiplicación por la parte fraccionaria, y
+   una suma) — trabajo adicional real que el caso "exacto" no necesita.
+
+   **Mismo ejemplo, ahora para CMSIS-DSP:**
+
+   | Paso | `x = 90°` | `x = 200°` |
+   |---|---|---|
+   | `fraccion = x/(2π)` | 1.570796/6.283185 = **0.250000** | 3.490659/6.283185 = **0.555556** |
+   | `indice = fraccion × 512` | 0.250000×512 = **128.0000** (entero exacto) | 0.555556×512 = **284.4444** (no exacto) |
+   | Trabajo de interpolación | Ninguno — lee `tabla[128]` directo | Lee `tabla[284]` y `tabla[285]`, interpola con la parte fraccionaria `0.4444` |
+   | Resultado | `sin(90°) = tabla[128] = 1.000000` ✓ | `sin(200°) ≈ interpolación ≈ −0.342` ✓ |
+
+   Igual que en libm: los ángulos múltiplo de 90° (0°, 90°, 180°, 270°) caen **justo** en una de
+   las 512 posiciones de la tabla (`512/4 = 128` posiciones exactas por cuadrante) y se ahorran la
+   interpolación; cualquier otro ángulo cae entre dos posiciones y paga el costo extra de leer dos
+   valores e interpolar.
 
 **El punto común:** cualquier función que intente ser *rápida en el caso típico* necesita alguna
 forma de "mirar" el valor de entrada y decidir cuánto trabajo hacer — eso es exactamente lo que
