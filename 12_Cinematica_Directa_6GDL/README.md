@@ -382,6 +382,23 @@ La diferencia entre niveles es el redondeo normal del CORDIC (13 iteraciones) �
 por las 13 iteraciones, dejando un residuo de pocos LSB. Latencia medida en el nivel 2: **~4.05 µs**
 por cálculo completo (ver sección 6).
 
+**Extensión con los 3 casos EXTRA de la lección 13 (STM32):** para poder armar la tabla
+comparativa FPGA-vs-STM32 de esa lección con datos reales (no una extrapolación), se agregaron al
+testbench de nivel 2 ([`tb.vhd`](tb.vhd), [`simular.do`](simular.do)) los 3 casos EXTRA en las
+mismas poses exactas usadas en el STM32 — `CasoD` = EXTRA-2 (peor caso), `CasoE` = EXTRA-1 (mejor
+caso "a ojo"), `CasoF` = EXTRA-3 (mejor caso real). Resultado de los 6 casos corridos juntos
+([log completo](ModelSim_6casos_FPGA_ciclos.log)):
+
+| Caso | Ciclos hasta `done_out` | Tiempo (20 ns/ciclo) |
+|---|---|---|
+| A, B, C, D, E, F (los 6, sin excepción) | **203** | **4.060 µs** |
+
+Los 6 casos —incluidos los dos ángulos más "irregulares" que existen en todo el proyecto (EXTRA-2
+y EXTRA-3)— dan **exactamente el mismo número de ciclos**, sin una sola unidad de diferencia. No
+es una propiedad que se infiera del diseño del CORDIC (13 iteraciones fijas) — queda confirmada
+empíricamente corriendo el hardware real con las mismas 6 poses que se usaron para caracterizar
+el STM32.
+
 **Verificación cruzada en MATLAB:** [`Metodo_Geometrico_RPY_6R.m`](Metodo_Geometrico_RPY_6R.m)
 reproduce los 3 casos de arriba con el método recursivo (comentario al inicio del archivo con los
 valores exactos de `theta1..theta6` a usar para cada uno) y reconstruye `Rz(yaw)·Ry(pitch)·Rx(roll)`

@@ -1,0 +1,232 @@
+Reading C:/intelFPGA_lite/18.1/modelsim_ase/tcl/vsim/pref.tcl
+
+# 10.5b
+
+# do simular.do
+# Model Technology ModelSim - Intel FPGA Edition vmap 10.5b Lib Mapping Utility 2016.10 Oct  5 2016
+# vmap work work 
+# Modifying modelsim.ini
+# --- Compilando paquetes ---
+# Model Technology ModelSim - Intel FPGA Edition vcom 10.5b Compiler 2016.10 Oct  5 2016
+# Start time: 12:52:54 on Sep 08,2026
+# vcom -93 -work work cordic_pkg.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling package cordic_pkg
+# End time: 12:52:54 on Sep 08,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 10.5b Compiler 2016.10 Oct  5 2016
+# Start time: 12:52:54 on Sep 08,2026
+# vcom -93 -work work ik_pkg.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package cordic_pkg
+# -- Compiling package ik_pkg
+# -- Compiling package body ik_pkg
+# -- Loading package ik_pkg
+# End time: 12:52:54 on Sep 08,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 10.5b Compiler 2016.10 Oct  5 2016
+# Start time: 12:52:54 on Sep 08,2026
+# vcom -93 -work work geom_pkg.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package cordic_pkg
+# -- Loading package ik_pkg
+# -- Compiling package geom_pkg
+# -- Compiling package body geom_pkg
+# -- Loading package geom_pkg
+# End time: 12:52:54 on Sep 08,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# --- Compilando modulos ---
+# Model Technology ModelSim - Intel FPGA Edition vcom 10.5b Compiler 2016.10 Oct  5 2016
+# Start time: 12:52:54 on Sep 08,2026
+# vcom -93 -work work cordic_sincos_16.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package cordic_pkg
+# -- Compiling entity cordic_sincos_16
+# -- Compiling architecture rtl of cordic_sincos_16
+# End time: 12:52:54 on Sep 08,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 10.5b Compiler 2016.10 Oct  5 2016
+# Start time: 12:52:54 on Sep 08,2026
+# vcom -93 -work work cordic_atan2_16.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package cordic_pkg
+# -- Loading package ik_pkg
+# -- Compiling entity cordic_atan2_16
+# -- Compiling architecture rtl of cordic_atan2_16
+# End time: 12:52:54 on Sep 08,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 10.5b Compiler 2016.10 Oct  5 2016
+# Start time: 12:52:54 on Sep 08,2026
+# vcom -93 -work work cordic_seq6.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity cordic_seq6
+# -- Compiling architecture rtl of cordic_seq6
+# End time: 12:52:55 on Sep 08,2026, Elapsed time: 0:00:01
+# Errors: 0, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 10.5b Compiler 2016.10 Oct  5 2016
+# Start time: 12:52:55 on Sep 08,2026
+# vcom -93 -work work fk_recursivo_core.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package cordic_pkg
+# -- Loading package ik_pkg
+# -- Loading package geom_pkg
+# -- Compiling entity fk_recursivo_core
+# -- Compiling architecture rtl of fk_recursivo_core
+# End time: 12:52:55 on Sep 08,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 10.5b Compiler 2016.10 Oct  5 2016
+# Start time: 12:52:55 on Sep 08,2026
+# vcom -93 -work work atan2_seq3.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package cordic_pkg
+# -- Loading package ik_pkg
+# -- Compiling entity atan2_seq3
+# -- Compiling architecture rtl of atan2_seq3
+# End time: 12:52:55 on Sep 08,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 10.5b Compiler 2016.10 Oct  5 2016
+# Start time: 12:52:55 on Sep 08,2026
+# vcom -93 -work work FK_7R_Geometrico_Con_Posicion.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity FK_7R_Geometrico_Con_Posicion
+# -- Compiling architecture bdf_type of FK_7R_Geometrico_Con_Posicion
+# End time: 12:52:55 on Sep 08,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# --- Compilando testbench ---
+# Model Technology ModelSim - Intel FPGA Edition vcom 10.5b Compiler 2016.10 Oct  5 2016
+# Start time: 12:52:55 on Sep 08,2026
+# vcom -93 -work work tb.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity tb
+# -- Compiling architecture sim of tb
+# End time: 12:52:55 on Sep 08,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# --- Iniciando simulacion ---
+# vsim -t 1ns -lib work tb 
+# Start time: 12:52:55 on Sep 08,2026
+# Loading std.standard
+# Loading std.textio(body)
+# Loading ieee.std_logic_1164(body)
+# Loading ieee.numeric_std(body)
+# Loading work.tb(sim)
+# Loading work.fk_7r_geometrico_con_posicion(bdf_type)
+# Loading work.cordic_pkg
+# Loading work.ik_pkg(body)
+# Loading work.geom_pkg(body)
+# Loading work.fk_recursivo_core(rtl)
+# Loading work.atan2_seq3(rtl)
+# Loading work.cordic_atan2_16(rtl)
+# Loading work.cordic_seq6(rtl)
+# Loading work.cordic_sincos_16(rtl)
+# ** Note: ============================================
+#    Time: 150 ns  Iteration: 0  Instance: /tb
+# ** Note: FK_7R_Geometrico_Con_Posicion -- integracion completa
+#    Time: 150 ns  Iteration: 0  Instance: /tb
+# ** Note: ============================================
+#    Time: 150 ns  Iteration: 0  Instance: /tb
+# ** Note: === CasoA [q=0] ===
+#    Time: 4270 ns  Iteration: 0  Instance: /tb
+# ** Note:   ciclos hasta done_out = 203
+#    Time: 4270 ns  Iteration: 0  Instance: /tb
+# ** Note:   x=3449  y=3  z=537
+#    Time: 4270 ns  Iteration: 0  Instance: /tb
+# ** Note:   yaw=-12857  pitch=19  roll=-12857
+#    Time: 4270 ns  Iteration: 0  Instance: /tb
+# ** Note:   referencia (modulo standalone, sin ruido de CORDIC): x=3441 y=0 z=532
+#    Time: 4270 ns  Iteration: 0  Instance: /tb
+# ** Note: === CasoB [SINGULARIDAD] ===
+#    Time: 8490 ns  Iteration: 0  Instance: /tb
+# ** Note:   ciclos hasta done_out = 203
+#    Time: 8490 ns  Iteration: 0  Instance: /tb
+# ** Note:   x=2027  y=1422  z=535
+#    Time: 8490 ns  Iteration: 0  Instance: /tb
+# ** Note:   yaw=0  pitch=12841  roll=25736
+#    Time: 8490 ns  Iteration: 0  Instance: /tb
+# ** Note:   referencia (modulo standalone, sin ruido de CORDIC): x=2024 y=1417 z=532
+#    Time: 8490 ns  Iteration: 0  Instance: /tb
+# ** Note: === CasoC [generico] th=30,20,-15,45,60,-70 deg ===
+#    Time: 12710 ns  Iteration: 0  Instance: /tb
+# ** Note:   ciclos hasta done_out = 203
+#    Time: 12710 ns  Iteration: 0  Instance: /tb
+# ** Note:   x=1813  y=2050  z=1862
+#    Time: 12710 ns  Iteration: 0  Instance: /tb
+# ** Note:   yaw=-6089  pitch=-4939  roll=-5347
+#    Time: 12710 ns  Iteration: 0  Instance: /tb
+# ** Note:   (caso generico -- comparar a ojo, CORDIC redondea unos pocos LSB)
+#    Time: 12710 ns  Iteration: 0  Instance: /tb
+# ** Note: === CasoD [SUPER DIFICIL] th=137.6,23.9,168.2,74.5,109.3,41.7 deg ===
+#    Time: 16930 ns  Iteration: 0  Instance: /tb
+# ** Note:   ciclos hasta done_out = 203
+#    Time: 16930 ns  Iteration: 0  Instance: /tb
+# ** Note:   x=-544  y=10  z=-517
+#    Time: 16930 ns  Iteration: 0  Instance: /tb
+# ** Note:   yaw=-12681  pitch=1697  roll=21005
+#    Time: 16930 ns  Iteration: 0  Instance: /tb
+# ** Note:   (caso generico -- comparar a ojo, CORDIC redondea unos pocos LSB)
+#    Time: 16930 ns  Iteration: 0  Instance: /tb
+# ** Note: === CasoE [EXTRA-1: 6 angulos en 90 grados] ===
+#    Time: 21150 ns  Iteration: 0  Instance: /tb
+# ** Note:   ciclos hasta done_out = 203
+#    Time: 21150 ns  Iteration: 0  Instance: /tb
+# ** Note:   x=-4  y=-1156  z=-12
+#    Time: 21150 ns  Iteration: 0  Instance: /tb
+# ** Note:   yaw=25731  pitch=-3  roll=-25717
+#    Time: 21150 ns  Iteration: 0  Instance: /tb
+# ** Note:   (caso generico -- comparar a ojo, CORDIC redondea unos pocos LSB)
+#    Time: 21150 ns  Iteration: 0  Instance: /tb
+# ** Note: === CasoF [EXTRA-3: singularidad + min. angulos] ===
+#    Time: 25370 ns  Iteration: 0  Instance: /tb
+# ** Note:   ciclos hasta done_out = 203
+#    Time: 25370 ns  Iteration: 0  Instance: /tb
+# ** Note:   x=-546  y=-1  z=-622
+#    Time: 25370 ns  Iteration: 0  Instance: /tb
+# ** Note:   yaw=0  pitch=12849  roll=25736
+#    Time: 25370 ns  Iteration: 0  Instance: /tb
+# ** Note:   (caso generico -- comparar a ojo, CORDIC redondea unos pocos LSB)
+#    Time: 25370 ns  Iteration: 0  Instance: /tb
+# ** Note: ============================================
+#    Time: 25470 ns  Iteration: 0  Instance: /tb
+# ** Note: FIN
+#    Time: 25470 ns  Iteration: 0  Instance: /tb
+# ** Note: ============================================
+#    Time: 25470 ns  Iteration: 0  Instance: /tb
+# wave zoomfull not supported in batch mode
+# 
+# ============================================
+# FK_7R_Geometrico_Con_Posicion -- integracion completa, 6 casos (A-F)
+# Los 6 casos coinciden con los del STM32 (leccion 13): A=Caso1 B=Caso2
+# C=Caso3 D=EXTRA-2 E=EXTRA-1 F=EXTRA-3 -- ver los ciclos hasta done_out
+# de cada uno arriba: deben ser identicos entre si (CORDIC es constante).
+# ============================================
+#  quit -f
+# End time: 12:52:55 on Sep 08,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
