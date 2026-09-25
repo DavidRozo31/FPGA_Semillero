@@ -1,80 +1,149 @@
 % =========================================================================
-% Verificacion cruzada: Metodo Geometrico (el que corre en la FPGA/STM32,
-% lecciones 11-13) vs Matrices de Transformacion Homogenea (MTH, 4x4,
-% construidas aqui desde cero con la tabla DH del brazo de 5 GDL+gripper).
+% Verificacion cruzada 6R: MATLAB (MTH) vs FPGA (ModelSim)
+% Formato numerico: Q3.20, valor_real = valor_entero / 2^20
 %
-% Idea: tomar los MISMOS angulos de entrada que ya se validaron en la FPGA
-% (lección 11, seccion 7) y calcular la pose del efector final por el
-% camino MTH clasico (T01*T12*T23*T34*T45) -- si los dos metodos
-% independientes coinciden, es una confirmacion fuerte de que el metodo
-% geometrico (elegido por ahorrar recursos logicos) es correcto.
-%
-% Universidad Militar Nueva Granada
+% Para cada caso se muestran por separado:
+% X, Y, Z, Roll, Pitch y Yaw.
 % =========================================================================
 clear; clc;
 
-%% ---- Longitudes del brazo (metros) -- igual que la leccion 11 ----
-L1 = 0.05; L2 = 0.107; L3 = 0.13; L45 = 0.18;   % L45 = L4+L5 combinados
+Q = 2^20;
 
-%% ---- Matriz DH generica: T = Rz(thetaZ)*Trans_z(Lz)*Trans_x(Lx)*Rx(thetaX) ----
-T = @(thetaZ, thetaX, Lz, Lx) [
-    cos(thetaZ) -cos(thetaX)*sin(thetaZ)  sin(thetaX)*sin(thetaZ)  Lx*cos(thetaZ);
-    sin(thetaZ)  cos(thetaX)*cos(thetaZ) -cos(thetaZ)*sin(thetaX)  Lx*sin(thetaZ);
-    0            sin(thetaX)              cos(thetaX)              Lz;
-    0            0                        0                        1];
+% Longitudes del robot en metros.
+L1 = 0.065;
+L2 = 0.107;
+d4 = 0.140;
+d6 = 0.173;
 
-%% ---- Casos de prueba (idénticos a la lección 11, sección 7) ----
-% [theta1 theta2 theta3 theta4 theta5] en grados
-casos = {
-    'Caso 1 (singularidad)', [0,   0, 0,  0,  0];
-    'Caso 2 (limpio)',       [45,  0, 0, 90, 45];
-    'Caso 3 (limpio)',       [0,  45, 0,  0,  0];
-};
-
-% Resultados ya validados en la FPGA (lección 11, tabla de la sección 7,
-% convertidos de Q2.13 a metros/grados: raw/8192)
-fpga = [
-     0.4178   0.0004   0.0503     0    -90.00  180.00;   % Caso 1 (yaw/roll estandarizados)
-     0.1679   0.1678   0.2304   -90.02    0.00    0.00;  % Caso 2
-     0.2952   0.0002   0.3450  -179.98  -45.00    0.02;  % Caso 3
+% Entradas de tb.vhd en Q3.20 radianes.
+% Columnas: theta1, theta2, theta3, theta4, theta5, theta6.
+entrada_q320 = [
+        0,       0,        0,        0,       0,        0;
+        0,       0,        0,        0, 1647099,  1647099;
+   549033,  366022,  -274517,   823550, 1098066, -1281077;
+  2518232,  437396,  3078246,  1363432, 2000311,   763156;
+  1647099, 1647099,  1647099,  1647099, 1647099,  1647099;
+        0,       0, -1647099, -1647099, 1647099,        0
 ];
 
-fprintf('%-22s | %-28s | %-28s\n', 'Caso', 'MTH (matrices 4x4)', 'FPGA (leccion 11)');
-fprintf('%s\n', repmat('-', 1, 90));
+% Resultados obtenidos en ModelSim, todos en Q3.20.
+% Columnas: X, Y, Z, Yaw, Pitch, Roll.
+fpga_q320 = [
+   440405,       1,   68159, -1647096,        4, -1647096;
+   259000,  181405,   68158,        0,  1647084,  3294199;
+   232277,  262378,  237898,  -777726,  -632504,  -685696;
+   -69434,    1441,  -65907, -1622664,   217994,  2689033;
+        0, -146803,   -1049,  3294199,       -4, -3294191;
+   -69208,      -1,  -78645,        0,  1647088,  3294199
+];
 
-for i = 1:size(casos,1)
-    nombre = casos{i,1};
-    ang = deg2rad(casos{i,2});
-    t1=ang(1); t2=ang(2); t3=ang(3); t4=ang(4); t5=ang(5);
+nombres = {'A','B','C','D','E','F'};
+descripcion = {
+    'theta = [0, 0, 0, 0, 0, 0] grados';
+    'theta = [0, 0, 0, 0, 90, 90] grados';
+    'theta = [30, 20, -15, 45, 60, -70] grados';
+    'theta = [137.6, 23.9, 168.2, 74.5, 109.3, 41.7] grados';
+    'theta = [90, 90, 90, 90, 90, 90] grados';
+    'theta = [0, 0, -90, -90, 90, 0] grados'
+};
 
-    T01 = T(t1,        pi/2, L1, 0);
-    T12 = T(t2,        0,    0,  L2);
-    T23 = T(t3,        0,    0,  L3);
-    T34 = T(t4 + pi/2, pi/2, 0,  0);
-    T45 = T(t5,        0,    L45, 0);
-    T05 = T01*T12*T23*T34*T45;
+matlab_q320 = zeros(6,6);
+matlab_real = zeros(6,6);
 
-    pos = T05(1:3,4);
-    R   = T05(1:3,1:3);
-    yaw   = rad2deg(atan2(R(2,1), R(1,1)));
-    pitch = rad2deg(atan2(-R(3,1), sqrt(R(1,1)^2+R(2,1)^2)));
-    roll  = rad2deg(atan2(R(3,2), R(3,3)));
+for caso = 1:6
+    theta = double(entrada_q320(caso,:))/Q;
+    t1=theta(1); t2=theta(2); t3=theta(3);
+    t4=theta(4); t5=theta(5); t6=theta(6);
 
-    mth_str  = sprintf('x=%.4f y=%.4f z=%.4f', pos(1), pos(2), pos(3));
-    fpga_str = sprintf('x=%.4f y=%.4f z=%.4f', fpga(i,1), fpga(i,2), fpga(i,3));
-    fprintf('%-22s | %-28s | %-28s\n', nombre, mth_str, fpga_str);
+    % Matrices DH del robot 6R.
+    T01 = [cos(t1) 0 sin(t1) 0;
+           sin(t1) 0 -cos(t1) 0;
+           0 1 0 L1;
+           0 0 0 1];
 
-    mth_ang  = sprintf('yaw=%.2f pitch=%.2f roll=%.2f', yaw, pitch, roll);
-    fpga_ang = sprintf('yaw=%.2f pitch=%.2f roll=%.2f', fpga(i,4), fpga(i,5), fpga(i,6));
-    fprintf('%-22s | %-28s | %-28s\n', '', mth_ang, fpga_ang);
+    T12 = [cos(t2) -sin(t2) 0 L2*cos(t2);
+           sin(t2)  cos(t2) 0 L2*sin(t2);
+           0 0 1 0;
+           0 0 0 1];
 
-    if i == 1
-        fprintf('%-22s | %s\n', '', 'Nota: yaw/roll INDIVIDUALES no comparables aqui (gimbal lock,');
-        fprintf('%-22s | %s\n', '', 'seccion 6 lección 13) -- solo yaw+roll es invariante: MTH=180.00, FPGA=180.00 (coincide).');
+    t3_DH = t3 + pi/2;
+    T23 = [cos(t3_DH) 0 sin(t3_DH) 0;
+           sin(t3_DH) 0 -cos(t3_DH) 0;
+           0 1 0 0;
+           0 0 0 1];
+
+    t4_DH = t4 + pi/2;
+    T34 = [cos(t4_DH) 0 sin(t4_DH) 0;
+           sin(t4_DH) 0 -cos(t4_DH) 0;
+           0 1 0 d4;
+           0 0 0 1];
+
+    T45 = [cos(t5) 0 -sin(t5) 0;
+           sin(t5) 0  cos(t5) 0;
+           0 -1 0 0;
+           0 0 0 1];
+
+    T56 = [cos(t6) -sin(t6) 0 0;
+           sin(t6)  cos(t6) 0 0;
+           0 0 1 d6;
+           0 0 0 1];
+
+    T06 = T01*T12*T23*T34*T45*T56;
+    posicion = T06(1:3,4).';
+    R06 = T06(1:3,1:3);
+
+    R11=R06(1,1); R21=R06(2,1); R31=R06(3,1);
+    R32=R06(3,2); R33=R06(3,3);
+    rho = sqrt(R11^2 + R21^2);
+
+    pitch = atan2(-R31,rho);
+    if rho < 50/Q
+        yaw = 0;
+        roll = pi;
+    else
+        yaw = atan2(R21,R11);
+        roll = atan2(R32,R33);
     end
-    if i == 3
-        fprintf('%-22s | %s\n', '', 'Nota: yaw=180.00 (MTH) y yaw=-179.98 (FPGA) son el mismo angulo fisico');
-        fprintf('%-22s | %s\n', '', '(corte de +-180 grados de atan2, seccion 7 lección 11).');
-    end
-    fprintf('\n');
+
+    % Orden comun de almacenamiento: X, Y, Z, Yaw, Pitch, Roll.
+    matlab_real(caso,:) = [posicion yaw pitch roll];
+    matlab_q320(caso,:) = round(matlab_real(caso,:)*Q);
 end
+
+fprintf('\nVERIFICACION CRUZADA 6R: MATLAB VS FPGA - FORMATO Q3.20\n');
+fprintf('Valor real = entero Q3.20 / 1048576\n');
+
+% Orden solicitado para presentar los resultados.
+orden = [1 2 3 6 5 4];
+variables = {'X','Y','Z','Roll','Pitch','Yaw'};
+
+for caso = 1:6
+    fprintf('\n===============================================================\n');
+    fprintf('CASO %s - %s\n',nombres{caso},descripcion{caso});
+    fprintf('===============================================================\n');
+    fprintf('%-7s | %12s | %12s | %14s | %14s | %9s\n', ...
+        'Valor','MATLAB Q3.20','FPGA Q3.20','MATLAB real','FPGA real','Error LSB');
+    fprintf('%s\n',repmat('-',1,86));
+
+    for fila = 1:6
+        columna = orden(fila);
+        valor_matlab = matlab_q320(caso,columna);
+        valor_fpga = fpga_q320(caso,columna);
+        error_lsb = valor_fpga-valor_matlab;
+
+        if columna <= 3
+            matlab_texto = sprintf('%.6f m',matlab_real(caso,columna));
+            fpga_texto = sprintf('%.6f m',fpga_q320(caso,columna)/Q);
+        else
+            matlab_texto = sprintf('%.6f deg',rad2deg(matlab_real(caso,columna)));
+            fpga_texto = sprintf('%.6f deg',rad2deg(fpga_q320(caso,columna)/Q));
+        end
+
+        fprintf('%-7s | %12d | %12d | %14s | %14s | %+9d\n', ...
+            variables{fila},valor_matlab,valor_fpga, ...
+            matlab_texto,fpga_texto,error_lsb);
+    end
+end
+
+fprintf('\nNota: los casos B y F tienen pitch cercano a 90 grados.\n');
+fprintf('En esa singularidad el VHDL fija Yaw=0 y Roll=180 grados.\n');

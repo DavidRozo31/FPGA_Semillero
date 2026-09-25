@@ -23,7 +23,7 @@ línea por línea.
 | 12 | [Cinematica_Directa_6GDL](12_Cinematica_Directa_6GDL/README.md) | De 5R+gripper a 6 GDL real: tabla DH corregida, la posición deja de ser independiente de la muñeca, y una crisis de recursos real (Fitter Failed) con su causa raíz medida y su arreglo | FPGA — cinemática |
 | 13 | [Cinematica_Directa_6GDL_STM32](13_Cinematica_Directa_6GDL_STM32/README.md) | La misma cinemática de 6 GDL portada a STM32 (216MHz vs 16MHz sin PLL), explicada paso a paso, y comparada en tiempo real contra la FPGA | STM32 — comparación |
 | 14 | [Desacople_Cinematico](14_Desacople_Cinematico/README.md) | Cinemática inversa 6GDL: de la pose deseada a los seis ángulos articulares, por desacople cinemático (muñeca esférica) | FPGA — cinemática inversa |
-| 15 | [Verificacion_MTH_vs_Geometrico](15_Verificacion_MTH_vs_Geometrico/README.md) | Verificación cruzada: el método geométrico (lecciones 11-13) contra matrices homogéneas 4×4 calculadas desde cero, mismos 3 casos de prueba | MATLAB — verificación |
+| 15 | [Verificacion_MTH_vs_Geometrico](15_Verificacion_MTH_vs_Geometrico/README.md) | Verificación cruzada 6R en Q3.20: matrices homogéneas MATLAB contra FPGA/ModelSim, con X, Y, Z, Roll, Pitch y Yaw para 6 casos | MATLAB — verificación |
 
 ### Orden de lectura recomendado
 
